@@ -1,0 +1,2593 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JRA Racing Analytics - Pro Edition</title>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<style>
+  :root {
+    --primary-color: #1e293b; --accent-color: #3b82f6; --bg-color: #f1f5f9;
+    --panel-bg: #ffffff; --border-color: #cbd5e1; --text-main: #334155;
+    --table-header: #1e293b; 
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Helvetica Neue", Arial, sans-serif; }
+  body { background: var(--bg-color); color: var(--text-main); font-size: 12px; }
+
+  .screen { display: none; }
+  .screen.active { display: block; animation: fadeIn 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+  .header { background: var(--primary-color); color: #fff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000; box-shadow: 0 2px 6px rgba(0,0,0,0.15); border-bottom: 3px solid var(--accent-color); }
+  .header-title { font-size: 16px; font-weight: 800; }
+  .btn-reset { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; transition: 0.2s;}
+  .btn-reset:hover { background: rgba(255,255,255,0.2); }
+  
+  .race-title-bar { background: linear-gradient(135deg, #1e293b, #0f172a); padding: 10px 16px; color: #fff; border-bottom: 3px solid var(--accent-color); display: none; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .rt-main-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .rt-badge { background: #ef4444; color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold; }
+  .rt-course { background: var(--table-header); color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 14px; font-weight: bold; }
+  
+  /* コース傾向エリア */
+  .course-feature-panel { background: rgba(255, 255, 255, 0.1); border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 4px; font-size: 13px; line-height: 1.4; display: none; }
+  .cf-label { color: #fbbf24; font-weight: bold; margin-right: 8px; }
+
+  #screen-init { padding: 40px 16px; max-width: 800px; margin: 0 auto; }
+  .init-card { background: var(--panel-bg); padding: 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: 1px solid var(--border-color); }
+  .init-textarea { width: 100%; height: 250px; border: 2px dashed #94a3b8; border-radius: 6px; padding: 12px; font-size: 13px; margin: 16px 0; background: #f8fafc; resize: vertical; }
+  .btn-start { width: 100%; background: #3b82f6; color: #fff; border: none; padding: 16px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+  .btn-start:hover { background: #2563eb; }
+
+  .dashboard-container { display: flex; flex-direction: column; gap: 12px; padding: 8px 12px; max-width: 1400px; margin: 0 auto; }
+
+  /* 展開表UI (ペースボード) */
+  .position-panel { background: #fff; border-radius: 6px; border: 1px solid var(--border-color); padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .pos-header { font-size: 14px; font-weight: bold; margin-bottom: 8px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; }
+  .pos-row { display: flex; align-items: center; margin-bottom: 6px; background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px dashed #cbd5e1; }
+  .pos-label { width: 40px; font-weight: bold; color: #fff; text-align: center; border-radius: 3px; padding: 4px 0; font-size: 12px; margin-right: 12px; flex-shrink: 0; }
+  .pos-area { flex-grow: 1; display: flex; gap: 6px; min-height: 28px; align-items: center; flex-wrap: wrap; }
+
+  /* グラフ調整エリア */
+  .graph-panel { background: #fff; border-radius: 6px; border: 1px solid var(--border-color); padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .graph-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px; }
+  .gh-title { font-size: 14px; font-weight: bold; color: #1e293b; display: flex; align-items: center; gap: 6px; }
+  .gh-controls { display: flex; align-items: center; gap: 8px; }
+  .total-prob { font-size: 14px; font-weight: bold; }
+  .total-prob.error { color: #ef4444; }
+  .total-prob.ok { color: #10b981; }
+  .btn-calc { background: #f59e0b; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+  .btn-calc:hover { background: #d97706; }
+  
+  .graph-rows { display: flex; flex-direction: column; gap: 6px; }
+  .gr-row { display: flex; align-items: center; gap: 8px; }
+  .gr-waku { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 4px; flex-shrink: 0; }
+  .gr-name { width: 120px; font-size: 12px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+    .gr-slider-wrap { flex-grow: 1; display: flex; align-items: center; gap: 8px; }
+  /* ▼ 修正：丸を消し、タップ式のプログレスバーに変更 ▼ */
+  .gr-bar-wrap { flex-grow: 1; height: 18px; background: #e2e8f0; border-radius: 4px; border: 1px solid #cbd5e1; cursor: pointer; position: relative; overflow: hidden; }
+  .gr-bar-fill { height: 100%; background: #3b82f6; transition: width 0.15s ease-out; }
+
+  .gr-val { width: 40px; text-align: right; font-weight: bold; color: #3b82f6; font-size: 12px; flex-shrink: 0; }
+  .gr-odds { width: 40px; text-align: right; font-size: 10px; color: #64748b; flex-shrink: 0; }
+
+  /* ハイライトコントロール */
+  .detail-controls-bar { display: flex; align-items: center; background: #fff; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); box-shadow: 0 1px 3px rgba(0,0,0,0.05); justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .hl-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;}
+  .hl-btn { background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 6px 12px; border-radius: 16px; font-size: 12px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 4px; }
+  .hl-btn.active[data-hl="rank"] { background: #fca5a5; color: #7f1d1d; border-color: #f87171; }
+  .hl-btn.active[data-hl="same"] { background: #d8b4fe; color: #581c87; border-color: #c084fc; }
+  .hl-btn.active[data-hl="time"] { background: #fef08a; color: #92400e; border-color: #fcd34d; }
+
+  /* メインテーブル */
+  .main-table-wrap { background: var(--panel-bg); overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+  .uma-table { border-collapse: collapse; width: max-content; table-layout: fixed; }
+  .uma-table th { background: var(--table-header); color: #fff; font-weight: bold; font-size: 11px; text-align: center; padding: 8px 4px; border: 1px solid #334155; position: sticky; top: 0; z-index: 3;}
+    /* ▼ 修正：セルの中身を上詰め（top）にし、拡大操作を強制許可する ▼ */
+  html, body { touch-action: auto !important; }
+  .uma-table td { border: 1px solid var(--border-color); vertical-align: top; padding: 0; background: #fff; }
+
+  
+  .uma-table th:nth-child(1), .uma-table td:nth-child(1) { position: sticky; left: 0; z-index: 2; background: #fff;}
+  .uma-table th:nth-child(2), .uma-table td:nth-child(2) { position: sticky; left: 30px; z-index: 2; background: #fff;}
+  .uma-table th:nth-child(3), .uma-table td:nth-child(3) { position: sticky; left: 80px; z-index: 2; background: #fff; border-right: 2px solid #64748b; box-shadow: 2px 0 4px rgba(0,0,0,0.1);}
+  .uma-table th:nth-child(1), .uma-table th:nth-child(2), .uma-table th:nth-child(3) { z-index: 4; }
+
+  .col-probs { width: 140px; min-width: 140px; max-width: 140px; padding: 0; background: #f8fafc !important; }
+  .col-past { width: 180px; min-width: 180px; max-width: 180px; padding: 0; }
+  .center-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 4px; box-sizing: border-box;}
+  
+  .waku { display: flex; width: 22px; height: 22px; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; border-radius: 4px; cursor: grab;}
+  .waku-1{background:#f8f9fa;color:#333;border:1px solid #ccc;}.waku-2{background:#424242;color:#fff;}.waku-3{background:#e53935;color:#fff;}.waku-4{background:#1e88e5;color:#fff;}.waku-5{background:#fdd835;color:#333;}.waku-6{background:#43a047;color:#fff;}.waku-7{background:#fb8c00;color:#fff;}.waku-8{background:#d81b60;color:#fff;}
+
+  .mark-select-wrapper { display:flex; align-items:center; justify-content:center; background:transparent; border-radius:3px; padding:0; width: 36px; height: 24px; margin-bottom: 4px;}
+  .mark-select { width: 100%; height: 100%; font-size: 14px; text-align: center; border: none; font-weight: bold; background:transparent; color:#333; appearance: none; outline: none; cursor: pointer;}
+  
+  .odds-val { font-size: 13px; font-weight: 900; color: #ef4444; text-align: center; }
+  
+  .horse-box-fixed { width: 100%; display: flex; flex-direction: column; justify-content: center; padding: 6px; }
+  .h-name-fixed { font-size: 14px; font-weight: 900; color: #1e293b; letter-spacing: -0.5px; margin-bottom: 2px; }
+  .h-ped-fixed { font-size: 11px; color: #475569; font-weight: bold; display: flex; gap: 4px; align-items: center; cursor: pointer; }
+  .sire-feature-badge { background: #fef3c7; color: #92400e; border: 1px solid #fde047; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: bold; cursor: help; }
+  .jockey-feature-badge { background: #e0f2fe; color: #1e40af; border: 1px solid #93c5fd; font-size: 10px; padding: 2px 4px; border-radius: 3px; font-weight: bold; cursor: pointer; }
+  
+  /* 確率表示セル */
+  .prob-cell { padding: 6px; display: flex; flex-direction: column; gap: 4px; justify-content: center; height: 100%; }
+  .prob-row { display: flex; align-items: center; gap: 4px; font-size: 11px; }
+  .prob-label { width: 24px; font-weight: bold; color: #64748b; text-align: right; }
+  .prob-val { font-weight: 900; width: 36px; text-align: right; }
+  .prob-bar-bg { flex-grow: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+  .prob-bar-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .p-win { color: #ef4444; } .bg-win { background: #ef4444; }
+  .p-ren { color: #3b82f6; } .bg-ren { background: #3b82f6; }
+  .p-fuku { color: #10b981; } .bg-fuku { background: #10b981; }
+
+  /* 過去走セル */
+  .past-cell { padding: 6px; display: flex; flex-direction: column; gap: 3px; height: 100%; min-height: 90px; border: 2px solid transparent; }
+  .past-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #cbd5e1; font-size: 12px; }
+  .pc-line1 { font-size: 10px; color: #64748b; font-weight: bold; display: flex; gap: 4px; flex-wrap: wrap; }
+  .pc-line2 { font-size: 12px; font-weight: 900; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
+  .pc-line3 { display: flex; align-items: center; gap: 4px; }
+  .pc-rank { display: inline-block; padding: 2px 6px; border-radius: 3px; font-weight: bold; color: #fff; font-size: 11px; }
+  .rank-1 { background: #ef4444; } .rank-2 { background: #3b82f6; } .rank-3 { background: #f59e0b; } .rank-other { background: #94a3b8; }
+  .pc-line4 { display: flex; align-items: baseline; gap: 6px; }
+  .pc-time { font-size: 13px; font-weight: 900; color: #1e293b;}
+  .pc-agari { font-size: 10px; font-weight: bold; color: #1e293b;}
+  .pc-pass { font-size: 10px; background: #f1f5f9; padding: 2px 4px; border-radius: 3px; border: 1px solid #cbd5e1; color: #334155;}
+  
+  /* ハイライトモード */
+  body.hl-mode-rank .past-cell.is-rank-1 { background-color: #fef2f2; border-color: #fca5a5; }
+  body.hl-mode-rank .past-cell.is-rank-2 { background-color: #f0f9ff; border-color: #7dd3fc; }
+  body.hl-mode-rank .past-cell.is-rank-3 { background-color: #fffbeb; border-color: #fde047; }
+  body.hl-mode-same .past-cell.same-group-1 { background-color: #fef2f2 !important; border: 2px solid #ef4444 !important; }
+  body.hl-mode-same .past-cell.same-group-2 { background-color: #eff6ff !important; border: 2px solid #3b82f6 !important; }
+  body.hl-mode-same .past-cell.same-group-3 { background-color: #f0fdf4 !important; border: 2px solid #10b981 !important; }
+  body.hl-mode-same .past-cell.same-group-4 { background-color: #fffbeb !important; border: 2px solid #f59e0b !important; }
+  body.hl-mode-time .past-cell.is-best-time { background-color: #fefce8 !important; border: 2px solid #f59e0b !important; box-shadow: inset 0 0 10px rgba(245,158,11,0.2); }
+  body.hl-mode-time .past-cell.is-best-agari { background-color: #ecfdf5 !important; border: 2px dashed #10b981 !important; }
+
+  /* 買い目ビルダー & オッズ計算 */
+  .bs-wrap { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-top: 12px;}
+  .bs-header { background: #dcfce7; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #bbf7d0;}
+  .bs-header-title { font-weight: 900; color: #166534; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .bs-select { padding: 4px 8px; font-weight: bold; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; }
+  .bs-body { display: flex; flex-wrap: wrap; }
+  .bs-left { flex: 1; min-width: 300px; padding: 12px; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; border-right: 1px solid #e2e8f0;}
+  .bs-right { width: 320px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 8px;}
+  
+  .bs-row { display: flex; align-items: center; gap: 10px; }
+  .bs-label { width: 36px; font-weight: 900; font-size: 13px; text-align: center; }
+  .bs-nums { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+  .bs-btn { width: 36px; height: 36px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-weight: 900; font-size: 14px; color: #334155; cursor: pointer; display: flex; justify-content: center; align-items: center; padding: 0; transition: 0.1s;}
+  .bs-btn.active-axis { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+  .bs-btn.active-opp { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+  
+  .odds-paste-area { width: 100%; height: 80px; font-size: 11px; border: 1px dashed #94a3b8; border-radius: 4px; padding: 6px; resize: vertical; background: #f8fafc; }
+  .btn-odds-apply { background: #1e293b; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; align-self: flex-end;}
+  .btn-odds-apply:hover { background: #334155; }
+  
+  .bs-summary-bar { display: flex; background: #1e3a8a; color: #fff; padding: 12px; flex-wrap: wrap; gap: 8px;}
+  .bs-sum-item { flex: 1; min-width: 120px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .bs-sum-item:last-child { border: none; }
+  .bs-sum-val { font-size: 20px; font-weight: 900; color: #38bdf8; }
+
+/* 修正後 */
+.ticket-list { flex-grow: 1; overflow-y: auto; max-height: 450px; border: 1px solid #e2e8f0; border-radius: 4px; background: #f8fafc; }
+  .ticket-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+  .ticket-comb { font-weight: bold; width: 60px; }
+  .ticket-prob { color: #64748b; width: 45px; text-align: right;}
+  .ticket-odds { color: #ef4444; font-weight: bold; width: 55px; text-align: right;}
+  .ticket-ev { font-weight: bold; width: 50px; text-align: right; padding: 2px 4px; border-radius: 3px;}
+  .ev-high { background: #fef2f2; color: #ef4444; border: 1px solid #fca5a5; }
+
+  /* 保存・ダウンロードボタン用 */
+  .system-section { background: #fff; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); padding: 12px;}
+  .btn-success { background: #10b981; color: #fff; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; width: 100%; font-size: 14px;}
+  .btn-success:hover { background: #059669; }
+
+  /* モーダルUI */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+  .modal-overlay.active { display: flex; }
+  .modal-content { background: #fff; border-radius: 8px; width: 90%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+  .modal-header { padding: 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-radius: 8px 8px 0 0; }
+  .modal-title { font-size: 16px; font-weight: bold; color: #1e293b; }
+  .btn-close-modal { background: none; border: none; font-size: 20px; cursor: pointer; color: #64748b; }
+  .modal-body { padding: 16px; overflow-y: auto; }
+  
+  .camp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .camp-card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; }
+  .camp-role { font-size: 11px; color: #64748b; font-weight: bold; margin-bottom: 4px; }
+  .camp-name { font-size: 14px; font-weight: bold; color: #1e293b; margin-bottom: 8px; border-bottom: 2px solid #3b82f6; padding-bottom: 4px; display: inline-block;}
+  .camp-stat-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; border-bottom: 1px dashed #f1f5f9; padding-bottom: 2px;}
+  .camp-val { font-weight: bold; }
+  .camp-val.good { color: #ef4444; }
+
+/* ▼ 追加：馬名クリックでハイライト・印の枠 ▼ */
+  /* ▼ 追加：グラフの +/- ボタンとアコーディオン用セル ▼ */
+  .btn-adj { width: 24px; height: 24px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #334155; cursor: pointer; flex-shrink: 0; padding: 0; font-size: 14px;}
+  .btn-adj:active { background: #e2e8f0; }
+  .col-accordion { display: none; }
+
+/* ▼ 追加：馬名クリックでハイライト・印の枠 ▼ */
+  .horse-highlight { background-color: #fef08a !important; padding: 2px 4px; border-radius: 4px; border-color: #fde047 !important; }
+
+  .h-name-text { cursor: pointer; user-select: none; border: 1px solid transparent; padding: 2px 4px; margin-left: -4px; border-radius: 4px; transition: 0.2s; }
+  .h-name-text:hover { background-color: #f1f5f9; border-color: #cbd5e1; }
+
+    /* =========================================
+ 
+  /* =========================================
+     ▼ スマホ用モバイル最適化（幅768px以下） ▼
+     ========================================= */
+  @media screen and (max-width: 768px) {
+    body { font-size: 11px; }
+    .dashboard-container { padding: 4px; }
+    
+    .gr-row { gap: 4px; font-size: 11px; }
+    .gr-waku { width: 18px; height: 18px; font-size: 10px; }
+    .gr-name { width: 85px; font-size: 9.5px; letter-spacing: -0.5px; }
+    .gr-val { width: 35px; font-size: 11px; }
+    .gr-odds { width: 35px; font-size: 9px; }
+    .gr-slider { touch-action: pan-y; }
+
+       /* ▼ スマホ限定の極限コンパクト化 ▼ */
+    .col-probs { display: none !important; }
+    .col-race-4 { display: none !important; } /* 右端に潰れていた4走前を完全に消去 */
+    
+    .uma-table th:nth-child(1), .uma-table td:nth-child(1) { width: 34px !important; min-width: 34px !important; padding: 1px !important; }
+    .uma-table th:nth-child(2), .uma-table td:nth-child(2) { left: 34px !important; width: 80px !important; min-width: 80px !important; padding: 1px !important; }
+    
+    /* ▼ 過去3走が残り幅を「ピッタリ均等割り」して埋め尽くす魔法の記述 ▼ */
+    .col-past { width: auto !important; min-width: 0 !important; max-width: none !important; padding: 1px !important; border-right: 1px solid #cbd5e1 !important; }
+    .uma-table { table-layout: fixed !important; width: 100vw !important; max-width: 100vw !important; overflow: hidden; }
+    
+    .past-cell { min-height: auto !important; height: auto !important; }
+    .col-accordion { display: none !important; }
+
+
+
+</style>
+
+
+</head>
+<body class="hl-mode-rank">
+
+<div class="header">
+  <div class="header-title">JRA Racing Analytics - Pro Edition</div>
+  <button class="btn-reset" onclick="location.reload()" id="btn-back" style="display:none;">リセット / 戻る</button>
+</div>
+
+<!-- 初期入力画面 -->
+<div id="screen-init" class="screen active">
+   <div class="init-card">
+    <h2 style="margin-bottom: 10px; color: #1e293b;">出馬表テキストをペースト</h2>
+    <p style="font-size: 12px; color: #64748b; margin-bottom: 8px;">
+      <a href="https://www.jra.go.jp/" target="_blank" style="color: #3b82f6; text-decoration: underline; font-weight: bold;">JRA公式サイト(PC版)</a> の出馬表を開き、<strong>「印刷用ページ」</strong>（過去走付き）のテキストを全選択してコピーし、ここに貼り付けてください。
+    </p>
+  
+       <div style="display: flex; flex-direction: column; gap: 24px;">
+      <!-- ▼ PC・Android用 窓口 ▼ -->
+      <div style="background: #f0fdf4; padding: 16px; border: 2px solid #22c55e; border-radius: 8px;">
+        <h3 style="color: #166534; margin-bottom: 8px;">🤖 PC・Androidからコピーした場合</h3>
+        <textarea id="jra-input" class="init-textarea" style="height: 120px; border-color: #22c55e; margin: 8px 0;" placeholder="通常のJRAテキストをここにペースト..."></textarea>
+        <button class="btn-start" style="background: #22c55e;" onclick="parseText()">通常版で解析スタート</button>
+      </div>
+
+      <!-- ▼ iPhone用 窓口 ▼ -->
+      <div style="background: #eff6ff; padding: 16px; border: 2px solid #3b82f6; border-radius: 8px;">
+        <h3 style="color: #1e40af; margin-bottom: 8px;">🍏 iPhoneからコピーした場合</h3>
+        <textarea id="jra-input-iphone" class="init-textarea" style="height: 120px; border-color: #3b82f6; margin: 8px 0;" placeholder="iPhoneのJRAテキストをここにペースト..."></textarea>
+        <!-- ここで確実に V2 を呼び出します -->
+        <button class="btn-start" style="background: #3b82f6;" onclick="parseTextIphoneV2()">iPhone版で解析スタート</button>
+      </div>
+    </div>
+
+    
+    <!-- ▼ 追加：保存済みレース一覧エリア -->
+    <div id="saved-races-area" style="margin-top: 24px; padding-top: 16px; border-top: 2px dashed #cbd5e1; display: none;">
+        <h3 style="font-size: 14px; color: #1e293b; margin-bottom: 10px;">📂 保存済みのレース (クリックで再開)</h3>
+        <div id="saved-races-list" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+        <button onclick="clearSavedRaces()" style="margin-top: 12px; font-size: 11px; background: none; border: none; color: #ef4444; text-decoration: underline; cursor: pointer;">保存データをすべて消去</button>
+    </div>
+    
+  </div>
+</div>
+
+<!-- メイン画面 -->
+<div id="screen-main" class="screen">
+  
+  <!-- 1. レース情報 ＆ コース傾向 -->
+  <div id="race-title-display" class="race-title-bar">
+    <div class="rt-main-info">
+      <span class="rt-badge" id="rt-basyo"></span> 
+      <span style="font-size:18px; font-weight:900;" id="rt-name"></span> 
+      <span class="rt-course" id="rt-course"></span>
+    </div>
+    <div class="course-feature-panel" id="course-feature">
+      <span class="cf-label">コース傾向</span><span id="cf-text"></span>
+    </div>
+  </div>
+
+   <div class="dashboard-container">
+    
+    <!-- ▼ 0. データ保存・ダウンロードエリア ▼ -->
+    <div class="system-section" style="display: flex; gap: 8px;">
+        <button class="btn-success" onclick="saveRaceToLocal()">💾 このレースの予想をブラウザに保存する</button>
+        <button class="btn-success" style="background: #3b82f6;" onclick="exportHtml()">📤 予想をファイル保存して共有する</button>
+    </div>
+
+    <!-- ▼ 1. 展開図（ペースボード） ▼ -->
+    <div class="position-panel">
+        <div class="pos-header">🏃‍♂️ 展開・隊列予想 (過去走の平均通過順より)</div>
+        <div class="pos-row"><div class="pos-label" style="background:#e74c3c;">逃げ</div><div class="pos-area" id="posNige"></div></div>
+        <div class="pos-row"><div class="pos-label" style="background:#f39c12;">先行</div><div class="pos-area" id="posSenko"></div></div>
+        <div class="pos-row"><div class="pos-label" style="background:#3498db;">差し</div><div class="pos-area" id="posSashi"></div></div>
+        <div class="pos-row"><div class="pos-label" style="background:#9b59b6;">追込</div><div class="pos-area" id="posOikomi"></div></div>
+    </div>
+
+    <!-- ▼ 2. AI見解＆マイメモ欄 ▼ -->
+    <div style="background: #fff; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+      <div style="font-size: 13px; font-weight: bold; color: #1e293b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+        📝 AI見解 ＆ レースメモ <span style="font-size: 10px; color: #64748b; font-weight: normal;">(自由に編集・保存できます)</span>
+      </div>
+      <textarea id="race-memo" style="width: 100%; height: 120px; border: 1px dashed #94a3b8; border-radius: 4px; padding: 8px; font-size: 13px; background: #f8fafc; resize: vertical; color: #334155; line-height: 1.5;"></textarea>
+    </div>
+
+   
+    
+    <div class="main-table-wrap">
+      <table class="uma-table" id="main-table-past">
+        <thead style="background-color: #1e293b; color: #ffffff;">
+          <tr>
+            <th style="width:50px; text-align:center; padding:8px 0; border-right:1px solid #475569; background-color: #1e293b !important; color: #ffffff !important;">馬番<br><span style="font-size:10px; color:#94a3b8;">(印)</span></th>
+            <th style="width:180px; text-align:left; padding:8px 12px; border-right:1px solid #475569; background-color: #1e293b !important; color: #ffffff !important;">
+              馬名 / 単勝オッズ<br>
+              <span style="font-size:9px; color:#93c5fd; font-weight:normal;">※枠内タップで陣営データ表示</span>
+            </th>
+            <th class="col-probs" style="text-align:center; padding:8px 0; border-right:1px solid #475569; background-color: #1e293b !important; color: #ffffff !important;">予測確率 <span style="font-size:10px;">(勝/連/複)</span></th>
+            <th class="col-past" style="text-align:center; padding:8px 0; border-right:1px solid #475569; background-color: #1e293b !important; color: #ffffff !important;">前走</th>
+            <th class="col-past" style="text-align:center; padding:8px 0; border-right:1px solid #475569; background-color: #1e293b !important; color: #ffffff !important;">2走前</th>
+            <th class="col-past" style="text-align:center; padding:8px 0; border-right:1px solid #475569; background-color: #1e293b !important; color: #ffffff !important;">3走前</th>
+                 <th class="col-past col-race-4" style="text-align:center; padding:8px 0; background-color: #1e293b !important; color: #ffffff !important;">4走前</th>
+          </tr>
+        </thead>
+        <tbody id="past-list"></tbody>
+      </table>
+    </div>
+
+    <!-- ▼ 4. 確率グラフ ＆ ハルヴィル計算 ▼ -->
+    <div class="graph-panel">
+               <div class="graph-header" style="display: flex; flex-direction: column; gap: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 12px;">
+        <div style="font-size: 13px; font-weight: bold; color: #1e293b;">📊 グラフを調節して勝率を作り、確定を押してください</div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="total-prob ok" id="graph-total" style="font-size: 14px; font-weight: bold;">合計: 100.0%</div>
+            <div style="display: flex; gap: 8px;">
+                <!-- ▼ 追加：初期状態(オッズ基準の勝率のみ)に戻すボタン ▼ -->
+                <button onclick="resetGraphToOdds()" style="background: #ef4444; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                    リセット
+                </button>
+                <!-- ▲ ここまで ▲ -->
+                <button onclick="normalizeTo100()" style="background: #64748b; color: white; border: none; border-radius: 4px; padding: 6px 12px; font-size: 12px; font-weight: bold; cursor: pointer;">
+                    100%に補正
+                </button>
+                <button class="btn-calc" onclick="calculateHarville()" style="padding: 6px 20px; font-size: 13px;">
+                    確定
+                </button>
+            </div>
+        </div>
+      </div>
+
+
+      <div class="graph-rows" id="graph-rows">
+        <!-- JSで生成 -->
+      </div>
+    </div>
+
+    <!-- ▼ 5. 買い目ビルダー ＆ オッズ貼り付け窓 ▼ -->
+    <div class="bs-wrap">
+      <div class="bs-header" style="flex-wrap: wrap; gap: 8px;">
+        <div class="bs-header-title">🎫 買い目構築 ＆ オッズ期待値計算</div>
+        
+        <div style="display:flex; gap:12px; align-items:center; background:#1e3a8a; color:#fff; padding:4px 12px; border-radius:4px; font-size:12px;">
+          <div><span id="bs-bet-count" style="font-size:16px; font-weight:bold; color:#38bdf8;">0</span> 点</div>
+          <div style="border-left:1px solid #64748b; padding-left:12px;">合算: <span id="bs-summary-prob" style="font-weight:bold;">0.0%</span></div>
+          <div style="border-left:1px solid #64748b; padding-left:12px;">合成: <span id="bs-summary-odds" style="font-weight:bold;">---</span></div>
+        </div>
+
+        <div style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+          <select id="bs-bet-type" class="bs-select" onchange="onBetTypeChange()">
+            <option value="馬連" selected>馬連</option>
+            <option value="ワイド">ワイド</option>
+            <option value="3連複">3連複</option>
+            <option value="3連単">3連単</option>
+          </select>
+          <button style="background:#ef4444; color:#fff; border:none; padding:4px 10px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="resetBuilder()">クリア</button>
+        </div>
+      </div>
+      <div class="bs-body">
+        <div class="bs-left">
+          <div class="bs-row"><div class="bs-label" style="color:#dc2626;">軸</div><div class="bs-nums" id="bs-axis"></div></div>
+          <div class="bs-row"><div class="bs-label" style="color:#2563eb;" id="bs-label-opp1">相手</div><div class="bs-nums" id="bs-opp1"></div></div>
+          <div class="bs-row" id="bs-row-opp2" style="display:none;"><div class="bs-label" style="color:#059669;">3着</div><div class="bs-nums" id="bs-opp2"></div></div>
+        </div>
+        <div class="bs-right">
+          <div style="font-size: 11px; font-weight: bold; color: #1e293b; margin-bottom: 4px;">
+            ▼ <a href="https://www.jra.go.jp/" target="_blank" style="color: #3b82f6; text-decoration: underline;">JRA公式サイト</a> のオッズをコピペ (例: 1-2 15.4)
+          </div>
+      <textarea id="actual-odds-input" class="odds-paste-area" placeholder="1-2  15.4&#10;1-3  22.1"></textarea>
+          <!-- ▼ 記憶と計算を1つのボタンに合体 ▼ -->
+          <div style="margin-top: 4px;">
+              <button onclick="saveOddsAndCalc()" style="background: #1e293b; color: #fff; border: none; padding: 8px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; width: 100%;">
+                  💾 オッズを記憶 ＆ 期待値を計算する
+              </button>
+          </div>
+          <!-- 修正後 -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; margin-bottom: 4px;">
+    <div style="font-size: 11px; font-weight: bold; color: #1e293b;">買い目リスト</div>
+    <button onclick="copyTickets()" style="background: #f1f5f9; border: 1px solid #cbd5e1; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; cursor: pointer; color: #475569;">
+        📋 買い目をコピー
+    </button>
+</div>
+          <div class="ticket-list" id="ticket-list"></div>
+        </div>
+      </div>
+    </div>
+   </div> <!-- dashboard-containerの終わり -->
+</div> <!-- screen-mainの終わり -->
+
+<!-- ▼ 陣営データ表示用モーダル（修復） ▼ -->
+<div class="modal-overlay" id="camp-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="camp-modal-title">陣営データ</div>
+      <button class="btn-close-modal" onclick="closeCampModal()">✖</button>
+    </div>
+    <div class="modal-body" id="camp-modal-body">
+      <!-- コンテンツ -->
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* =========================================================
+   コース傾向データベース (内蔵辞書)
+========================================================= */
+/* =========================================================
+   基準タイムデータ (別ツールから移植)
+========================================================= */
+const RAW_STANDARD_TIMES = `
+中京 【ダ1200m】 1.13.6 1.12.8 1.11.8 1.11.4 1.11.6 -
+中京 【ダ1400m】 1.26.3 1.25.3 1.24.9 1.24.4 1.23.8 1.22.7
+中京 【ダ1800m】 1.55.3 1.54.6 1.53.5 1.53.2 1.52.4 1.51.2
+中京 【ダ1900m】 - 2.01.3 2.00.2 1.59.6 1.58.6 -
+中京 【芝1200m/内】 1.08.8 1.08.8 1.08.8 1.08.6 1.08.0 1.08.2
+中京 【芝1400m/内】 1.22.0 1.21.5 1.20.5 1.21.3 1.20.1 1.20.4
+中京 【芝1600m/内】 1.36.2 1.34.4 1.34.5 1.34.3 1.34.8 1.33.5
+中京 【芝2000m/内】 2.03.1 2.01.2 2.00.4 2.00.6 1.59.9 2.00.4
+中京 【芝2200m/内】 - 2.14.5 2.13.3 2.13.2 - 2.09.8
+中京 【芝3000m/内】 - - - - - 3.10.2
+中山 【ダ1200m】 1.12.7 1.12.3 1.11.5 1.11.2 1.10.7 1.10.0
+中山 【ダ1800m】 1.56.2 1.55.2 1.54.0 1.53.4 1.52.3 1.51.9
+中山 【ダ2400m】 - - 2.35.8 2.35.4 - -
+中山 【ダ2500m】 - - 2.43.2 - - -
+中山 【芝1200m外】 1.09.2 1.09.2 1.08.8 1.07.8 1.07.8 1.07.5
+中山 【芝1600m外】 1.35.8 1.34.5 1.33.8 1.33.6 1.33.1 1.33.4
+中山 【芝1800m/内】 1.49.7 1.49.5 1.48.3 1.49.0 1.47.0 1.47.7
+中山 【芝2000m/内】 2.02.6 2.01.3 1.59.8 1.59.6 1.59.9 1.59.5
+中山 【芝2200m外】 - 2.14.3 2.13.8 2.13.0 2.11.7 2.11.0
+中山 【芝2500m/内】 - - 2.32.3 2.33.1 2.34.5 2.33.8
+中山 【芝3600m/内】 - - - - - 3.47.2
+京都 【ダ1200m】 1.13.1 1.12.8 1.11.7 1.11.3 1.10.3 1.10.6
+京都 【ダ1400m】 1.25.5 1.25.1 1.24.3 1.23.3 1.23.2 1.22.8
+京都 【ダ1800m】 1.54.3 1.53.8 1.52.5 1.51.4 1.50.4 1.50.0
+京都 【ダ1900m】 - 2.00.9 2.00.5 1.58.5 1.57.8 1.57.3
+京都 【芝1200m/内】 1.10.0 1.09.2 1.09.0 1.08.7 1.08.1 1.08.3
+京都 【芝1400m/内】 1.21.7 1.21.2 - - - -
+京都 【芝1400m外】 - - 1.21.5 1.20.8 1.21.4 1.20.7
+京都 【芝1600m/内】 1.35.2 1.35.1 1.34.6 - - -
+京都 【芝1600m外】 - - 1.33.8 1.34.0 1.33.3 1.33.0
+京都 【芝1800m外】 1.48.6 1.47.8 1.46.8 1.46.8 1.45.7 1.45.9
+京都 【芝2000m/内】 2.02.3 2.01.6 2.00.5 2.00.1 2.01.7 1.59.2
+京都 【芝2200m外】 - 2.15.6 2.14.1 2.13.5 2.15.8 2.13.8
+京都 【芝2400m外】 - 2.27.7 2.26.1 2.26.1 2.24.6 2.23.9
+京都 【芝3000m外】 - - - - 3.03.8 3.04.0
+京都 【芝3200m外】 - - - - - 3.14.0
+函館 【ダ1000m】 0.58.8 0.58.9 0.58.5 0.58.9 - -
+函館 【ダ1700m】 - 1.45.9 1.45.5 1.44.7 - 1.43.5
+函館 【ダ2400m】 - 2.34.2 2.34.7 - - -
+函館 【芝1000m/内】 0.56.4 - - - - -
+函館 【芝1200m/内】 1.09.5 1.09.0 1.08.5 1.08.3 1.09.0 1.07.7
+函館 【芝1800m/内】 1.49.3 1.48.1 1.47.1 1.46.2 1.46.3 1.44.8
+函館 【芝2000m/内】 - 2.00.6 2.00.3 1.59.4 - 1.57.6
+函館 【芝2600m/内】 - 2.38.6 2.41.2 2.43.5 - -
+小倉 【ダ1000m】 1.01.5 0.58.7 0.58.2 0.57.9 0.59.0 -
+小倉 【ダ1700m】 - 1.46.8 1.45.6 1.45.5 1.44.0 1.43.2
+小倉 【ダ2400m】 - - 2.33.1 - - -
+小倉 【芝1200m/内】 1.10.2 1.09.1 1.09.1 1.08.5 1.08.5 1.08.9
+小倉 【芝1800m/内】 1.50.9 1.50.0 1.48.3 1.48.6 1.47.0 1.46.1
+小倉 【芝2000m/内】 2.03.4 2.02.3 2.01.4 2.01.2 2.04.4 1.59.9
+小倉 【芝2600m/内】 - 2.44.4 2.41.8 2.39.4 - -
+新潟 【ダ1200m】 1.12.9 1.11.9 1.11.6 1.10.8 1.10.9 1.10.8
+新潟 【ダ1800m】 1.56.0 1.54.9 1.53.3 1.52.6 1.51.9 1.50.9
+新潟 【ダ2500m】 - - 2.41.8 - - -
+新潟 【芝1000m/内】 - 0.55.7 0.55.2 0.55.2 0.55.3 0.54.8
+新潟 【芝1200m/内】 1.09.8 1.10.1 1.10.2 1.09.8 1.08.0 -
+新潟 【芝1400m/内】 1.22.5 1.22.1 1.22.1 1.20.5 1.19.1 1.21.4
+新潟 【芝1600m外】 1.36.2 1.35.0 1.33.8 1.31.8 1.32.5 1.32.2
+新潟 【芝1800m外】 1.49.0 1.48.0 1.47.7 1.46.5 1.48.1 1.46.2
+新潟 【芝2000m/内】 2.03.9 2.02.6 - - - -
+新潟 【芝2000m外】 - - 2.00.9 2.01.0 1.58.2 1.59.2
+新潟 【芝2200m/内】 - 2.15.0 2.13.5 2.14.3 2.12.1 2.12.7
+新潟 【芝2400m/内】 - 2.28.3 2.25.4 - - -
+札幌 【ダ1000m】 - 0.59.2 0.58.6 0.58.7 - -
+札幌 【ダ1700m】 1.46.3 1.46.2 1.45.5 1.44.6 1.43.5 1.43.5
+札幌 【ダ2400m】 - 2.37.2 2.34.6 - - -
+札幌 【芝1200m/内】 1.10.6 1.09.8 1.09.3 1.09.0 1.07.4 1.09.4
+札幌 【芝1500m/内】 1.30.2 1.29.8 1.29.1 1.28.3 1.29.5 1.29.7
+札幌 【芝1800m/内】 1.51.0 1.49.8 1.48.6 1.48.5 - 1.48.7
+札幌 【芝2000m/内】 2.04.5 2.02.5 2.01.0 2.03.3 2.01.2 2.01.5
+札幌 【芝2600m/内】 - 2.42.8 2.43.2 2.41.6 - 2.43.2
+東京 【ダ1300m】 1.20.5 1.18.9 1.18.5 1.17.7 1.16.5 -
+東京 【ダ1400m】 1.26.1 1.25.6 1.24.4 1.23.9 1.23.3 1.23.0
+東京 【ダ1600m】 1.39.7 1.37.9 1.37.1 1.36.5 1.35.5 1.35.5
+東京 【ダ2100m】 - 2.13.0 2.11.6 2.11.0 2.10.6 2.09.1
+東京 【芝1400m/内】 1.23.1 1.22.2 1.21.5 1.20.9 1.20.7 1.20.7
+東京 【芝1600m/内】 1.35.2 1.34.4 1.33.5 1.33.7 1.33.3 1.32.5
+東京 【芝1800m/内】 1.48.4 1.47.5 1.46.3 1.46.5 1.45.5 1.45.8
+東京 【芝2000m/内】 2.01.8 2.00.6 2.00.0 2.00.0 1.58.1 1.58.6
+東京 【芝2400m/内】 - 2.28.2 2.26.4 2.25.6 2.26.3 2.23.7
+東京 【芝2500m/内】 - - - - - 2.31.6
+東京 【芝3400m/内】 - - - - - 3.32.2
+福島 【ダ1150m】 1.10.2 1.09.1 1.08.9 1.08.5 1.08.3 1.07.3
+福島 【ダ1700m】 1.47.7 1.47.6 1.46.3 1.45.8 1.45.5 1.44.5
+福島 【ダ2400m】 - - 2.34.6 - - -
+福島 【芝1200m/内】 1.10.7 1.09.5 1.09.0 1.08.6 1.09.4 1.08.9
+福島 【芝1800m/内】 1.51.8 1.49.4 1.47.6 1.47.8 1.49.6 1.46.6
+福島 【芝2000m/内】 2.04.9 2.01.9 2.00.3 2.02.5 1.59.3 2.00.1
+福島 【芝2600m/内】 - 2.41.2 2.41.1 2.42.1 - -
+阪神 【ダ1200m】 1.13.9 1.13.1 1.12.3 1.11.1 1.10.9 1.10.8
+阪神 【ダ1400m】 1.26.0 1.25.7 1.24.8 1.24.2 1.24.0 1.23.7
+阪神 【ダ1800m】 1.55.0 1.55.1 1.53.8 1.53.0 1.52.7 1.51.0
+阪神 【ダ2000m】 - 2.09.2 2.06.9 2.06.1 2.05.5 2.04.7
+阪神 【芝1200m/内】 1.10.4 1.09.0 1.08.8 1.08.6 1.08.1 1.07.8
+阪神 【芝1400m/内】 1.22.5 1.21.4 1.20.5 1.20.2 1.20.6 1.19.8
+阪神 【芝1600m外】 1.35.8 1.34.0 1.33.9 1.33.8 1.32.4 1.32.9
+阪神 【芝1800m外】 1.48.3 1.47.1 1.46.0 1.45.4 1.44.8 1.44.4
+阪神 【芝2000m/内】 2.03.4 2.01.5 2.00.1 2.00.0 1.59.2 1.59.2
+阪神 【芝2200m/内】 - 2.13.6 2.13.0 2.11.8 2.12.8 2.11.1
+阪神 【芝2400m外】 - 2.28.0 2.25.5 2.26.0 2.25.1 2.26.4
+`;
+
+const STANDARD_TIMES = {};
+RAW_STANDARD_TIMES.trim().split('\n').forEach(line => {
+    const parts = line.split(/\s+/);
+    if (parts.length >= 8) {
+        const basho = parts[0];
+        const course = parts[1].replace(/[【】]/g, '');
+        if (!STANDARD_TIMES[basho]) STANDARD_TIMES[basho] = {};
+        STANDARD_TIMES[basho][course] = parts.slice(2, 8);
+    }
+});
+
+function getStandardTime(basho, track, dist, title) {
+    let b = basho;
+    if (!STANDARD_TIMES[b]) return null;
+    let t = track === 'ダート' ? 'ダ' : track;
+    let searchKey = t + dist + "m";
+    let match = null;
+    
+    // 条件に合うコースを検索
+    for (let key in STANDARD_TIMES[b]) {
+        if (key.startsWith(searchKey)) { match = STANDARD_TIMES[b][key]; break; }
+    }
+    if (!match) return null;
+
+    // レース名からクラスを推測 (0:新馬 1:未勝利 2:1勝 3:2勝 4:3勝 5:OP)
+    let cIdx = 1;
+    if (title.includes('新馬')) cIdx = 0;
+    else if (title.includes('未勝利')) cIdx = 1;
+    else if (title.includes('1勝')) cIdx = 2;
+    else if (title.includes('2勝')) cIdx = 3;
+    else if (title.includes('3勝')) cIdx = 4;
+    else if (title.includes('オープン') || title.includes('OP') || title.match(/G[123]/i) || title.includes('重賞') || title.includes('S') || title.includes('特別') || title.includes('賞') || title.includes('ステークス')) cIdx = 5;
+
+    return match[cIdx];
+}
+
+const COURSE_FEATURES = {
+    "京都_ダート_1200m": "平坦でスピードが出やすい。先行馬が止まりにくい。",
+    "京都_ダート_1400m": "芝スタート。テン速く直線平坦で前残り多い。",
+    "京都_ダート_1800m": "坂の下りからペースが上がる。先行力と持続力が必要。",
+    "京都_ダート_1900m": "コーナー4つのスタミナ勝負。向正面からのロンスパ対応。",
+    "京都_芝_1200m": "内回り。逃げ・先行有利だがハイペースで内差しも。",
+    "京都_芝_1400m": "内回り。スピードと立ち回りの上手さ。",
+    "京都_芝_1600m_外": "外回り。下りから勢いをつけての末脚勝負。",
+    "京都_芝_2000m": "内回り。立ち回りの上手さと内枠先行馬が有利。",
+    "京都_芝_2200m_外": "下り坂からのロングスパート戦。スタミナ要求度高。",
+    "京都_芝_2400m_外": "外回り。折り合いと3コーナー下りからのロンスパ適性が重要。",
+    "京都_芝_3000m_外": "淀の坂を2回越える。折り合いとスタミナが最も重要。",
+    "京都_芝_3200m_外": "絶対的なスタミナと折り合い、下りの上手さが必要。",
+    "阪神_ダート_1200m": "下り坂でハイペース。直線の急坂をこなすパワーが必要。",
+    "阪神_ダート_1400m": "芝スタート。外枠有利。タフな流れになりやすい。",
+    "阪神_ダート_1800m": "急坂を2回こなす。先行力とスタミナ、パワーを兼ね備えた馬。",
+    "阪神_ダート_2000m": "芝スタートで急坂を2回越える。圧倒的なスタミナが必要。",
+    "阪神_芝_1200m": "内回り。スピードだけでなく急坂用のパワーも必要。",
+    "阪神_芝_1400m": "内回り。持続力と急坂をこなすパワーが必要。",
+    "阪神_芝_1600m_外": "外回り。純粋な瞬発力と末脚のキレが問われる実力勝負。",
+    "阪神_芝_1800m_外": "外回り。直線長くスロー上がり勝負。瞬発力特化。",
+    "阪神_芝_2000m": "内回り。コーナー4つ。急坂をこなすパワー型の先行〜差し馬有利。",
+    "阪神_芝_2200m": "タフな展開になりやすく、スタミナとロンスパ適性が必要。",
+    "阪神_芝_2400m_外": "ゆったりしたペースから直線の瞬発力・末脚勝負。",
+    "阪神_芝_3000m": "2度の急坂を越えるタフなスタミナ勝負。",
+    "東京_ダート_1300m": "芝スタート。スピード重視だが差しも届く。",
+    "東京_ダート_1400m": "芝スタート。直線長く差し馬の台頭が多い。",
+    "東京_ダート_1600m": "芝スタート。外枠有利。タフで直線末脚が必要。",
+    "東京_ダート_2100m": "広くて長い。スタミナ型の差し馬が台頭しやすい。",
+    "東京_芝_1400m": "ペースが流れやすく持続力が問われる。",
+    "東京_芝_1600m": "ごまかし効かない。純粋な末脚スピードとキレが問われる。",
+    "東京_芝_1800m": "瞬発力特化の切れ味勝負になりやすい。",
+    "東京_芝_2000m": "スタート直後にコーナーで外枠不利。ポジション取りカギ。",
+    "東京_芝_2400m": "底なしのスタミナと瞬発力が必要。ごまかしが効かない。",
+    "中山_ダート_1200m": "芝スタート。ハイペース耐性とパワーが必要。",
+    "中山_ダート_1800m": "タフなコース。スタミナとパワー、マクリの機動力が問われる。",
+    "中山_ダート_2400m": "非常にスタミナを要しバテ合いになりやすい。",
+    "中山_芝_1200m": "外回り。下り坂で超ハイペース。逃げ・先行基本。",
+    "中山_芝_1600m": "トリッキーで外枠不利。器用な立ち回りとパワーが必要。",
+    "中山_芝_1800m": "内枠有利。先行力と立ち回りの上手さが必要。",
+    "中山_芝_2000m": "内回り。直線の急坂と小回り対応力。機動力ある先行馬有利。",
+    "中山_芝_2200m": "外回り。機動力と持続力のある馬が有利。",
+    "中山_芝_2500m": "コーナー6回。ポジション争いと立ち回りの機動力が必要。",
+    "中京_ダート_1200m": "上り坂スタート。急坂でスタミナとパワーが問われる。",
+    "中京_ダート_1400m": "芝スタート。外枠有利。直線長く差し馬の台頭目立つ。",
+    "中京_ダート_1800m": "坂途中スタートでテンが遅い。スタミナ勝負。",
+    "中京_ダート_1900m": "急坂2回で非常にタフ。スタミナ型差し馬の台頭注意。",
+    "中京_芝_1200m": "逃げ馬に厳しく差し・追込が決まりやすい。",
+    "中京_芝_1400m": "1600mをこなせるスタミナが活きる。",
+    "中京_芝_1600m": "直線が長く急坂あり。マイルのスピードとタフさが必要。",
+    "中京_芝_2000m": "タフな左回り。長く良い脚を使える持続力が必要。",
+    "中京_芝_2200m": "タフな左回り。ロンスパ戦になりやすい。",
+    "新潟_ダート_1200m": "平坦でスピードが出やすい。逃げ・先行有利。",
+    "新潟_ダート_1800m": "コーナーきつく先行して粘り込める持久力が必要。",
+    "新潟_芝_1000m": "直線のみ。圧倒的に外枠（7・8枠）が有利。",
+    "新潟_芝_1400m": "内回り。先行力と機動力が問われる。",
+    "新潟_芝_1600m_外": "外回り。日本一長い直線での瞬発力・末脚勝負。",
+    "新潟_芝_1800m_外": "外回り。極限の上がり勝負。瞬発力が全て。",
+    "新潟_芝_2000m_外": "外回り。スローからの上がり勝負になりやすい。",
+    "福島_ダート_1150m": "超ハイペースになりやすく逃げ・先行が有利。",
+    "福島_ダート_1700m": "小回りで直線短い。マクリが決まりやすい。",
+    "福島_芝_1200m": "下りスタートでハイペース。前有利だが差しも。",
+    "福島_芝_1800m": "小回り。内枠の先行馬が有利。",
+    "福島_芝_2000m": "小回り特有のロンスパ戦に対応できる馬。",
+    "小倉_ダート_1000m": "下り坂スタートで超ハイペース必至。逃げ馬が強い。",
+    "小倉_ダート_1700m": "小回りで直線平坦。3〜4コーナーでのマクリが決まる。",
+    "小倉_芝_1200m": "下り坂スタートでスピードが出やすい。前有利。",
+    "小倉_芝_1800m": "テンが落ち着きやすく先行有利。",
+    "小倉_芝_2000m": "テン争いが激しくなりやすい。タフなロンスパ戦。",
+    "札幌_ダート_1000m": "平坦で直線短く逃げ・先行有利。テンのスピード最重要。",
+    "札幌_ダート_1700m": "スピード持続しやすい。先行力とコーナリング性能。",
+    "札幌_芝_1200m": "洋芝で時計かかる。前有利だが荒れると外差しも。",
+    "札幌_芝_1500m": "内枠有利。テンの速さと先行力が問われる。",
+    "札幌_芝_2000m": "ペース落ち着きやすい。内枠先行馬有利。",
+    "函館_ダート_1000m": "JRAで最も直線短い。テンのスピードがすべて。",
+    "函館_ダート_1700m": "高低差あるタフなコース。先行馬が有利。",
+    "函館_芝_1200m": "洋芝でタフ。パワー型スプリンターや前が有利。",
+    "函館_芝_2000m": "ペース落ち着きやすい。タフな洋芝適性が必須。"
+};
+
+const SIRE_FEATURES = {
+    "キズナ": "パワー型ディープ系。タフな芝やダートが得意。",
+    "エピファネイア": "ロベルト系のスタミナ。タフな持続力勝負で爆発。",
+    "ロードカナロア": "圧倒的スピード。高速馬場の短・マイル戦で活躍。",
+    "キタサンブラック": "広い王道コースの中長距離で圧倒的スタミナを発揮。",
+    "サートゥルナーリア": "ロードカナロア産駒だが中距離志向。芝の瞬発力。",
+    "ドレフォン": "ダート短〜マイル中心。芝もこなすパワー型。",
+    "モーリス": "芝マイル〜中距離。古馬になり本格化する晩成型。",
+    "ルヴァンスレーヴ": "ダート中距離特化。シンボリクリスエス系の底力。",
+    "レイデオロ": "キンカメ系。芝中距離が主戦場もダート替わりに注意。",
+    "ナダル": "米国産ロベルト系。ダート中距離で圧倒的なパワー。",
+    "シルバーステート": "ディープ系。芝マイル〜中距離で早い上がりを繰り出す。",
+    "リオンディーズ": "キンカメ系。芝マイル前後で前向きなスピードを発揮。",
+    "コントレイル": "ディープ後継。芝の瞬発力勝負、中長距離の王道。",
+    "モズアスコット": "フランケル系。芝ダート問わずマイル以下のスピード。",
+    "リアルスティール": "ディープ系。芝中距離。海外適性やタフな馬場もこなす。",
+    "サトノダイヤモンド": "ディープ系。芝長距離。スタミナと持続力勝負に強い。",
+    "ブリックスアンドモルタル": "ストームキャット系。芝中距離。重馬場やタフな展開○。",
+    "アドマイヤマーズ": "ダイワメジャー後継。芝マイルで早熟性とスピード。",
+    "ドゥラメンテ": "キンカメ系。芝中距離。圧倒的爆発力とスケール感。",
+    "シニスターミニスター": "ダート特化。地方交流重賞や砂の深いタフな馬場に強い。",
+    "ミッキーアイル": "ディープ系。芝ダートの短距離〜マイルで逃げ先行。",
+    "クリソベリル": "ゴールドアリュール系。ダート中距離の圧倒的パワー。",
+    "オルフェーヴル": "ステイゴールド系。芝ダート問わず規格外の爆発力。",
+    "パイロ": "ダート短〜中距離。揉まれ弱いので外枠や砂被り注意。",
+    "マインドユアビスケッツ": "ダート短〜中。芝もこなすヴァイスリージェント系。",
+    "シスキン": "欧州系。芝マイル以下で鋭い瞬発力とスピード。",
+    "サンダースノー": "ダート中距離。タフな馬場を先行して粘り込む。",
+    "カリフォルニアクローム": "ダート中距離。米国ダートのスピードと先行力。",
+    "ゴールドシップ": "ステイゴールド系。芝長距離。タフな馬場や洋芝で無双。",
+    "デクラレーションオブウォー": "芝ダート不問。マイル〜中距離で先行押し切り。",
+    "アルアイン": "ディープ系。芝中距離。瞬発力より持続力・パワー勝負。",
+    "タワーオブロンドン": "ゴスホークケン系。圧倒的な芝スプリント特化型。",
+    "ゴールドドリーム": "ゴールドアリュール系。ダートマイル〜中距離の王道。",
+    "ベンバトル": "ドバイ産。芝ダートのマイル〜中距離でタフなスピード。",
+    "マジェスティックウォリアー": "ダート特化。揉まれ強さと安定した先行力を持つ。",
+    "ニューイヤーズデイ": "ダート中距離。マキャヴェリアン系のパワーと持続力。",
+    "スワーヴリチャード": "ハーツクライ系。芝中距離。高い瞬発力と成長力。",
+    "イスラボニータ": "フジキセキ系。芝マイル〜1400m。機動力と立ち回り。",
+    "ビッグアーサー": "サクラバクシンオー系。芝スプリント特化のスピード。",
+    "ルーラーシップ": "キンカメ系。芝中〜長距離。トビが大きく外回り向き。",
+    "ディスクリートキャット": "ダート短〜マイル。軽いダートや芝スタートが得意。",
+    "ヘニーヒューズ": "ダート短距離の絶対王者。スピードとパワーの塊。",
+    "フィエールマン": "ディープ系。芝長距離。圧倒的なスタミナと末脚。",
+    "ダノンレジェンド": "ダート短距離〜マイル。地方交流や小回りで活躍。",
+    "ミスターメロディ": "ダート・芝の短距離。スキャットダディ系の早熟力。",
+    "ホッコータルマエ": "キンカメ系ダート。地方交流やタフな中距離で無双。",
+    "ダノンプレミアム": "ディープ系。芝マイル〜中距離。高い先行力と機動力。",
+    "ジャスタウェイ": "ハーツクライ系。芝中距離。成長力と持続的な末脚。",
+    "ハービンジャー": "欧州系。洋芝や重馬場が得意。タフな芝中長距離。",
+    "インディチャンプ": "ステイゴールド系。芝マイル〜スプリントのスピード。",
+    "サトノアラジン": "ディープ系。芝マイル。大外一気の末脚が武器。",
+    "グレーターロンドン": "ディープ系。芝マイル〜中距離で鋭い瞬発力を発揮。",
+    "ミスチヴィアスアレックス": "米国産。ダート短距離の圧倒的な快速スピード。",
+    "ウインブライト": "ステイゴールド系。中山や洋芝などタフな小回り中距離。",
+    "スクリーンヒーロー": "ロベルト系。芝中長距離。冬場やタフな馬場に強い。",
+    "ポエティックフレア": "欧州マイラー。芝の短距離〜マイルでスピード勝負。",
+    "モーニン": "ヘニーヒューズ系。ダート短〜マイルで圧倒的スピード。",
+    "サトノクラウン": "欧州系。重馬場や洋芝のタフな中距離戦で台頭する。",
+    "フォーウィールドライブ": "アメリカンファラオ系。ダート短距離のスピード。",
+    "ダノンスマッシュ": "ロードカナロア系。芝スプリント特化。前向きな気性。",
+    "エスポワールシチー": "ゴールドアリュール系。ダート短〜中距離の逃げ先行。",
+    "ダノンバラード": "ディープ系。芝の中距離やタフなローカル小回り○。",
+    "ファインニードル": "アドマイヤムーン系。芝短距離。スプリント戦の持続力。",
+    "マクフィ": "芝ダート問わずマイル前後。タフな馬場や洋芝もこなす。",
+    "アメリカンペイトリオット": "ダート短距離〜マイル。ウォーフロント系のスピード。",
+    "フィレンツェファイア": "ダート短距離。米国系のスピードとパワー。",
+    "Into Mischief": "米国ダート界の覇者。ダート短〜中距離の絶対的スピード。",
+    "ダイワメジャー": "芝マイルの王道。早熟性と先行抜け出しの持久力勝負。",
+    "ハーツクライ": "芝中長距離。トビが大きく広いコースで覚醒する晩成型。",
+    "アジアエクスプレス": "ヘニーヒューズ系。ダート短〜マイルのスピード型。",
+    "コパノリッキー": "ゴールドアリュール系。ダート中距離の先行パワー。",
+    "シャンハイボビー": "ダート短距離。仕上がり早でテンのスピード抜群。",
+    "マテラスカイ": "ダート短距離特化。圧倒的なテンのスピードで逃げ切る。",
+    "カレンブラックヒル": "ダイワメジャー系。ダートもこなすマイル先行型。",
+    "ダノンキングリー": "ディープ系。芝マイル〜中距離で非凡な瞬発力を誇る。",
+    "タリスマニック": "欧州系だがダート中長距離でも。スタミナと持続力。",
+    "American Pharoah": "ダート中距離。圧倒的なスピードとパワーを両立。",
+    "ロジャーバローズ": "ディープ系。芝中距離。タフなペースの先行粘り込み。",
+    "ディーマジェスティ": "ディープ系。芝中長距離。タフな馬場や洋芝で台頭。",
+    "レッドファルクス": "スウェプトオーヴァーボード系。芝ダート短距離〜マイル。",
+    "ブラックタイド": "芝中長距離。ディープ全兄だが産駒はパワー・スタミナ型。",
+    "ヘンリーバローズ": "ディープ系。出走少ないが芝中距離での素質に期待。",
+    "エフフォーリア": "エピファネイア系。芝中距離の王道。中山や東京で圧倒。",
+    "ラブリーデイ": "キンカメ系。芝中距離。立ち回りの上手さと機動力が武器。",
+    "リアルインパクト": "ディープ系。芝マイル。先行してのスピードと持続力。",
+    "ディープインパクト": "芝中長距離の絶対王者。瞬発力と切れ味は歴史的トップ。",
+    "アニマルキングダム": "芝ダート不問のマイル〜中距離。タフな馬場が得意。",
+    "Gun Runner": "米国ダート界の超大物。ダート中距離のスピードと底力。",
+    "ワールドプレミア": "ディープ系。芝長距離。豊富なスタミナと末脚勝負。",
+    "Frosted": "タピット系。ダート短〜マイル。米国のスピードとパワー。",
+    "Tiz the Law": "ダート中距離。タフな展開を押し切るスピードとスタミナ。",
+    "ロゴタイプ": "ローエングリン系。芝マイル〜中距離の先行持続力勝負。",
+    "シュヴァルグラン": "ハーツクライ系。芝長距離。スタミナと成長力に富む。",
+    "ミッキーグローリー": "ディープ系。芝マイル。鋭い瞬発力とマイラー適性。",
+    "ゴールドアクター": "スクリーンヒーロー系。芝中長距離。中山などタフな舞台。",
+    "Frankel": "欧州の怪物。芝マイル〜中距離。圧倒的なスピードと底力。",
+    "バゴ": "欧州系。芝中距離やタフな重馬場、洋芝で激走するパワー型。",
+    "Saxon Warrior": "ディープ系。欧州芝マイル〜中距離。タフな馬場適性。",
+    "トーセンラー": "ディープ系。芝マイル〜中長距離。京都など軽い芝で台頭。",
+    "キセキ": "ルーラーシップ系。芝中長距離。無尽蔵のスタミナと逃げ先行力。",
+    "リーチザクラウン": "スペシャルウィーク系。芝ダートのマイラー。タフネス。",
+    "ベストウォーリア": "マジェスティックウォリアー系。ダート短距離〜マイル。",
+    "キンシャサノキセキ": "フジキセキ系。芝ダートの短距離。仕上がり早。",
+    "ビーチパトロール": "芝中距離。タフな馬場やローカルの持続力勝負が得意。",
+    "ジョーカプチーノ": "マンハッタンカフェ系。芝ダート短距離のスピード逃げ。",
+    "ダンカーク": "アンブライドルズソング系。ダート短〜マイルのスピード。",
+    "Kingman": "欧州系。芝マイル。圧倒的なスピードと切れ味を誇る。",
+    "Too Darn Hot": "ダバウィ系。芝短距離〜マイル。高いスピード能力。",
+    "ヴァンゴッホ": "アメリカンファラオ系。芝中距離。欧州のタフな馬場適性。",
+    "Justify": "スキャットダディ系。芝ダート問わず。圧倒的スケール。",
+    "ミッキーロケット": "キンカメ系。芝中長距離。タフな宝塚記念等の舞台に強い。",
+    "Practical Joke": "イントゥミスチーフ系。ダート短距離〜マイルのスピード。",
+    "アドマイヤムーン": "芝短距離のスペシャリスト。洋芝や道悪にも対応可能。",
+    "サングレーザー": "ディープ系。芝マイル〜中距離。鋭い瞬発力を秘める。",
+    "ホークビル": "キトゥンズジョイ系。芝中長距離。タフな馬場や洋芝。",
+    "ハクサンムーン": "アドマイヤムーン系。芝短距離の逃げ・先行スピード。",
+    "ノヴェリスト": "欧州系。芝中長距離。洋芝やタフな馬場でのスタミナ勝負。",
+    "エイシンヒカリ": "ディープ系。芝中距離。圧倒的な逃げのスピードとペース。",
+    "Speightstown": "ダート短距離〜マイルの快速。芝のスプリント戦もこなす。",
+    "エイシンフラッシュ": "キンカメ系。芝中距離。スローの上がり勝負・瞬発力特化。",
+    "Nyquist": "アンクルモー系。ダート短〜マイルの卓越したスピード。",
+    "Palace Malice": "カーリン系。ダート中距離や芝マイルでタフな持続力。",
+    "キングカメハメハ": "芝ダート不問の万能型。圧倒的なパワーと底力を伝える。",
+    "ネロ": "ヨハネスブルグ系。ダート短距離。ダッシュ力とテンの速さ。",
+    "エスケンデレヤ": "ジャイアンツコーズウェイ系。ダート中距離のパワー。",
+    "Good Magic": "カーリン系。ダート中距離。米国ダートの王道パワー。",
+    "Authentic": "イントゥミスチーフ系。ダート中距離。圧倒的な先行スピード。",
+    "ロジユニヴァース": "ネオユニヴァース系。芝中距離。重馬場やタフな展開。",
+    "Liam's Map": "アンブライドルズソング系。ダートマイル〜中距離スピード。",
+    "Iffraaj": "欧州系。芝マイル〜中距離。タフな馬場や時計の掛かる芝向き。",
+    "Night of Thunder": "ダバウィ系。芝マイル前後。スピードとパワーの融合。",
+    "Maxfield": "ストリートセンス系。ダート中距離の持続力とパワー。",
+    "サリオス": "ハーツクライ系。芝マイル〜中距離。雄大な馬体とパワー。",
+    "Charlatan": "スパイツタウン系。ダート短〜マイルの絶対的なスピード。",
+    "Constitution": "タピット系。ダート中距離。高いスピードと機動力。",
+    "ディープブリランテ": "ディープ系。芝マイル〜中距離。早熟性と先行持続力。",
+    "ヤマカツエース": "キンカメ系。芝中距離。ローカルやタフな小回りコース。",
+    "タニノフランケル": "フランケル系。芝マイル〜中距離。逃げ先行のしぶとさ。",
+    "St Mark's Basilica": "シユーニ系。芝中距離。欧州トップクラスの瞬発力。",
+    "City of Light": "クオリティロード系。ダートマイル〜中距離スピード。",
+    "Sottsass": "シユーニ系。芝中距離。凱旋門賞馬のタフネスと機動力。",
+    "グァンチャーレ": "スクリーンヒーロー系。芝マイル。立ち回りの巧さと持続力。",
+    "McKinzie": "ストリートセンス系。ダートマイル〜中距離の先行抜け出し。",
+    "No Nay Never": "スキャットダディ系。芝短距離の卓越したスピード。",
+    "ストロングリターン": "シンボリクリスエス系。芝ダートのマイル戦に強い。",
+    "バンブーエール": "アフリート系。ダート短距離。一本調子のスピード逃げ。",
+    "Maclean's Music": "ディストーティドヒューマー系。ダート短距離の爆発力。",
+    "Mendelssohn": "スキャットダディ系。芝ダート問わずマイル〜中距離。",
+    "Yaupon": "アンクルモー系。ダート短距離の圧倒的スピード。",
+    "Bolt d'Oro": "メダグリアドーロ系。ダート中距離のパワーと持続力。",
+    "Cloud Computing": "マキャヴェリアン系。ダート中距離のスタミナ。",
+    "Union Rags": "ディキシーランドバンド系。ダート中距離のタフな底力。",
+    "ロージズインメイ": "ヘイロー系。ダート中長距離や障害戦での圧倒的スタミナ。",
+    "Tapit": "米国ダート界の巨人。ダート中距離のスピードと闘争心。",
+    "Caravaggio": "スキャットダディ系。芝短距離の圧倒的なスピード。",
+    "カラヴァッジオ": "スキャットダディ系。芝短距離の圧倒的なスピード。",
+    "オーヴァルエース": "ヘニーヒューズ系。ダート短距離〜マイルのスピード。",
+    "Twirling Candy": "キャンディライド系。ダート短〜マイルのスピード。",
+    "パドトロワ": "スウェプトオーヴァーボード系。ダート短距離のテンの速さ。",
+    "ノーブルミッション": "ガリレオ系。タフな芝やダート中距離。フランケル全弟。",
+    "フリオーソ": "ブライアンズタイム系。地方ダート中距離の圧倒的タフネス。",
+    "Golden Horn": "ケープクロス系。芝中長距離。欧州のタフなスタミナ。",
+    "Collected": "シティジップ系。ダート中距離のスピード先行型。",
+    "ワールドエース": "ディープ系。芝マイル〜中距離。タフな馬場の差し脚。",
+    "スズカコーズウェイ": "ジャイアンツコーズウェイ系。ダート短〜マイル。",
+    "ヴィクトワールピサ": "ネオユニヴァース系。芝中距離。中山などの小回りで機動力。",
+    "ワンアンドオンリー": "ハーツクライ系。芝中長距離。トビが大きく外回り向き。",
+    "ザファクター": "ウォーフロント系。ダート短距離〜マイルのスピード。",
+    "Mitole": "エスケンデレヤ系。ダート短距離の快速スプリンター。",
+    "リオンリオン": "ルーラーシップ系。芝中長距離。逃げ先行のしぶとさ。",
+    "バンドワゴン": "ホワイトマズル系。芝中距離。パワー型の先行馬。",
+    "トーセンレーヴ": "ディープ系。芝マイル〜中距離。切れ味と素軽さ。",
+    "Harry Angel": "ダークエンジェル系。芝ダート短距離。圧倒的なスピード。",
+    "Mor Spirit": "エスケンデレヤ系。ダートマイル〜中距離のパワー。",
+    "シュウジ": "キンシャサノキセキ系。芝ダート短距離のスピード。",
+    "Flightline": "タピット系。ダート中距離。歴史的なスピードと能力の違い。",
+    "ヴァンセンヌ": "ディープ系。芝マイル。持続的な末脚とスピード。",
+    "トゥザグローリー": "キンカメ系。芝中長距離。タフな舞台や冬場に強い。",
+    "トランセンド": "ワイルドラッシュ系。ダート中距離の逃げ・先行粘り込み。",
+    "Essential Quality": "タピット系。ダート中距離。高い完成度と底力。",
+    "Adios Charlie": "インディアンチャーリー系。ダート短距離のスピード。",
+    "アレスバローズ": "ディープ系。芝短距離。鋭い差し脚が武器。",
+    "インカンテーション": "シニスターミニスター系。ダート中距離のタフな先行力。",
+    "Take Charge Indy": "エーピーインディ系。ダート中距離のスピードとパワー。",
+    "シゲルカガ": "パイロ系。ダート短距離。テンのスピードで押し切る。",
+    "メイショウサムソン": "オペラハウス系。芝ダート中長距離。タフな馬場や重馬場。",
+    "スマートオーディン": "ダノンシャンティ系。芝マイル〜中距離。極限の上がり勝負。",
+    "Knicks Go": "ペインター系。ダートマイル〜中距離の圧倒的逃げスピード。",
+    "More Than Ready": "サザンヘイロー系。芝ダート短〜マイル。仕上がり早。",
+    "Arrogate": "アンブライドルズソング系。ダート中距離。スケールと底力。",
+    "シビルウォー": "ウォーエンブレム系。地方ダート中長距離の無尽蔵のスタミナ。",
+    "Volatile": "ヴァイオレンス系。ダート短距離の圧倒的なスピード。",
+    "Lea": "ファーストサムライ系。ダート・芝のマイル〜中距離。",
+    "ウォータービルド": "ディープ系。芝ダートのマイル前後。",
+    "Study of Man": "ディープ系。芝中距離。欧州特有のタフな持続力勝負。",
+    "Mo Town": "アンクルモー系。ダート中距離のスピードとパワー。",
+    "ラニ": "タピット系。ダート中長距離。ズブいがバテない圧倒的スタミナ。",
+    "ケープブランコ": "ガリレオ系。芝ダート中長距離。時計の掛かるタフな馬場。",
+    "Not This Time": "ジャイアンツコーズウェイ系。ダート中距離のパワー。",
+    "Beau Liam": "リアムズマップ系。ダート短距離の快速スピード。"
+};
+
+const JOCKEY_FEATURES = {
+    "ルメール": "コースロス皆無の完璧な騎乗。大一番での信頼度は絶大。",
+    "岩田望来": "積極的な先行策が持ち味。ダートや平坦コースで活躍。",
+    "松山弘平": "逃げ・先行馬の操縦に長ける。ロスのない立ち回りが光る。",
+    "横山武史": "若き関東エース。積極果敢な前付けと剛腕で押し切る。",
+    "坂井瑠星": "抜群のスタートと先行力。海外経験も豊富な若手エリート。",
+    "川田将雅": "圧倒的勝率を誇る。ダートや先行馬で他を圧倒する剛腕。",
+    "戸崎圭太": "関東トップジョッキー。道中の折り合いと安定感が武器。",
+    "西村淳也": "闘志あふれる積極騎乗。ローカルや小回りで存在感を示す。",
+    "丹内祐次": "ローカルの鬼。北海道シリーズや小回りで抜群の成績。",
+    "荻野極": "ダイナミックなフォーム。思い切った先行策に魅力あり。",
+    "横山和生": "逃げ馬に乗せたら怖い存在。マイペースの逃げで大物食いも。",
+    "武豊": "競馬界のレジェンド。絶妙なペース判断と体内時計は健在。",
+    "津村明秀": "関東のベテラン。折り合い重視からの直線勝負が得意。",
+    "吉村誠之": "地方競馬で圧倒的実績。中央でも持ち前の剛腕を発揮。",
+    "吉村誠之助": "若手のホープ。減量を活かした積極的な先行策が魅力。",
+    "高杉吏麒": "ルーキー。軽斤量を活かした思い切りの良い騎乗が光る。",
+    "鮫島克駿": "抜群のスタートセンス。ダート短距離の先行争いに強い。",
+    "斎藤新": "積極的なポジション取り。ローカル開催でコンスタントに活躍。",
+    "佐々木大": "関東の若手有望株。ローカル開催で勝ち星を量産する。",
+    "佐々木大輔": "関東の若手有望株。ローカル開催で勝ち星を量産する。",
+    "北村友一": "ケガから復帰のガッツマン。イン突きなど勝負強さが光る。",
+    "団野大成": "関西の若き実力派。思い切った仕掛けと勝負度胸を持つ。",
+    "三浦皇成": "関東の中堅エース。ダート戦や先行馬での安定感が高い。",
+    "舟山瑠泉": "フレッシュな若手。今後の成長とアグレッシブな騎乗に期待。",
+    "田山旺佑": "新進気鋭の若手。減量を活かした前残り一発に警戒。",
+    "松若風馬": "逃げ先行が得意。マイペースに持ち込んだ時の粘りは驚威。",
+    "小林美駒": "女性騎手。斤量減を活かした積極的な前付けが持ち味。",
+    "菊沢一樹": "関東の中堅。人気薄での一発や思い切った騎乗が魅力。",
+    "横山典弘": "天才的な閃き。ポツン最後方などトリッキーな騎乗で魅了。",
+    "浜中俊": "関西のベテラン。大舞台での勝負強さとイン突きが得意。",
+    "菅原明良": "関東のホープ。力強い追い込みと勝負所での反応が良い。",
+    "Ｃ．デム": "Cデムーロ。欧州トップの剛腕。圧倒的な追える力を持つ。",
+    "田口貫太": "愛されキャラの若手。減量を活かしダートで好成績。",
+    "西塚洸二": "積極的なレース運び。ローカルやダートで穴を開ける。",
+    "幸英明": "鉄人。騎乗数トップクラスで、先行粘り込みに定評あり。",
+    "レーン": "豪州の名手。ロスのない立ち回りと直線での豪快な追い。",
+    "丸山元気": "関東のベテラン。ローカル開催や先行馬での安定感。",
+    "池添謙一": "癖馬を乗りこなすグランプリ男。大舞台での勝負強さ。",
+    "田辺裕信": "折り合い重視。差し・追い込み馬での直線一気が得意。",
+    "岩田康誠": "イン突きの名手。ロスなく回り直線で抜け出す勝負師。",
+    "菱田裕二": "コツコツ勝ち星を重ねる。先行しての粘り強さが光る。",
+    "石川裕紀": "関東の中堅。重賞での思い切った騎乗や穴開けに注意。",
+    "石川裕紀人": "関東の中堅。重賞での思い切った騎乗や穴開けに注意。",
+    "横山琉人": "減量を活かした騎乗。ダートの短距離戦などで活躍。",
+    "原優介": "ダートの中長距離で活躍。穴馬を上位に持ってくる腕。",
+    "小沢大仁": "関西の若手。積極的な前付けから粘り込む競馬が得意。",
+    "富田暁": "関西の中堅。ダート戦や先行馬でコンスタントに活躍。",
+    "吉田隼人": "堅実な騎乗スタイル。ローカル開催で安定した成績。",
+    "酒井学": "穴男。人気薄での逃げや大外強襲など思い切った騎乗。",
+    "木幡巧也": "関東の中堅。ダート戦や伏兵馬での粘り込みに警戒。",
+    "古川吉洋": "ベテランの味。先行馬に乗せた時のペース判断が絶妙。",
+    "杉原誠人": "千直の鬼。新潟直線1000mでの勝負強さはトップ級。",
+    "松本大輝": "長身を活かしたダイナミックなフォーム。積極騎乗。",
+    "大野拓弥": "砂の職人。ダートの差し・追い込み馬で真価を発揮。",
+    "角田大和": "積極果敢なレース運び。ダートの先行争いで引かない。",
+    "今村聖奈": "女性騎手のホープ。軽斤量を活かした先行策が魅力。",
+    "小崎綾也": "海外経験あり。ダート戦での思い切った騎乗が光る。",
+    "亀田温心": "ローカルで活躍。前目につける積極的な競馬が得意。",
+    "石神深道": "若手。障害王者の父の背を追うフレッシュな騎乗に期待。",
+    "長浜鴻緒": "ルーキー。減量特典を活かした積極的な前付けに注意。",
+    "プーシャ": "短期免許。欧州仕込みの力強い追いで馬を動かす。",
+    "キング": "R.キング。風車ムチで馬を動かすパワフルな女性騎手。",
+    "石田拓郎": "関東の若手。人気薄での一発や思い切った仕掛け。",
+    "石橋脩": "見栄えのするフォーム。芝の長距離や先行馬が得意。",
+    "武藤雅": "関東の若手。ローカル開催やダート戦で穴を開ける。",
+    "ディー": "短期免許。アグレッシブな騎乗と剛腕が武器。",
+    "河原田菜": "女性騎手。減量を活かした逃げ・先行で穴を開ける。",
+    "河原田菜々": "女性騎手。減量を活かした逃げ・先行で穴を開ける。",
+    "永島まな": "女性騎手。積極的な騎乗でダートやローカルで活躍。",
+    "永島まなみ": "女性騎手。積極的な騎乗でダートやローカルで活躍。",
+    "太宰啓介": "渋いベテラン。人気薄の差し馬で密かに上位に食い込む。",
+    "ゴンサル": "短期免許。スタートセンスと力強い追いが特徴。",
+    "高田潤": "障害のトップジョッキー。飛越の技術と勝負強さ。",
+    "上野翔": "障害戦を中心に騎乗。安定した飛越とコース取り。",
+    "コレット": "海外からの短期免許。最後まで諦めないしぶとい追い。",
+    "吉田豊": "逃げ馬に乗せたら怖いベテラン。パンパンに張った逃げ。",
+    "マーカン": "マーカンド。馬を動かす超剛腕は世界トップクラス。",
+    "小牧加矢": "障害専門騎手。馬術出身の圧倒的な飛越技術を持つ。",
+    "小牧加矢太": "障害専門騎手。馬術出身の圧倒的な飛越技術を持つ。",
+    "モレイラ": "マジックマン。完璧な位置取りと馬を動かす天才的腕。",
+    "上里直汰": "若手のホープ。フレッシュで思い切りの良い騎乗。",
+    "嶋田純次": "障害やローカルで騎乗。伏兵馬での一発に警戒が必要。",
+    "Ｍ．デム": "Mデムーロ。大舞台での勝負強さ。まくりや豪快な差し。",
+    "藤岡佑介": "ペース判断に長ける。折り合いをつけて確実な末脚を。",
+    "森田誠也": "若手の有望株。減量を活かした積極的な前付け。",
+    "国分恭介": "逃げ・先行での思い切りが良い。ローカルで穴を開ける。",
+    "古川奈穂": "女性騎手。軽斤量を活かした逃げでマイペースに持ち込む。",
+    "和田陽希": "新進気鋭の若手。今後の成長とアグレッシブな騎乗に期待。",
+    "藤懸貴志": "穴メーカー。人気薄での思い切った逃げや強襲に注意。",
+    "内田博幸": "元祖剛腕。ダート戦での力強いアクションで馬を動かす。",
+    "柴田裕一": "関西の若手。減量を活かした積極策で穴を開ける。",
+    "難波剛健": "障害戦のベテラン。安定した飛越で馬の力を引き出す。",
+    "ハマーハ": "外国人騎手。欧州仕込みのパワフルなフォームが特徴。",
+    "国分優作": "荒削りだが思い切りの良い騎乗。ダートの先行で一発。",
+    "秋山稔樹": "若手の中では落ち着いた騎乗。先行しての粘りが持ち味。",
+    "草野太郎": "障害戦を中心に活躍。タフなコースでの粘り強さ。",
+    "五十嵐雄": "障害界のレジェンド。飛越技術は圧倒的トップクラス。",
+    "坂口智康": "障害戦を中心に騎乗。安定したレース運びが光る。",
+    "大江原圭": "障害戦で活躍。思い切った仕掛けで波乱を演出する。",
+    "伴啓太": "障害戦が主戦場。馬の良さを引き出す丁寧な飛越。",
+    "佐藤翔馬": "関東の若手。減量を活かした積極的なレース運び。",
+    "松岡正海": "穴男。伏兵馬を上位に持ってくる腕と度胸を持つ。",
+    "和田竜二": "闘将。最後まで諦めずに馬を動かす腕力と勝負根性。",
+    "木幡初也": "関東の中堅。ダート戦やローカルで地道に結果を出す。",
+    "中井裕二": "関西の中堅。人気薄での思い切った騎乗が時折ハマる。",
+    "丸田恭介": "追い込みの鬼。展開待ちだがハマった時の破壊力は抜群。",
+    "鷲頭虎太": "関西の若手。軽斤量を活かしたダートでの先行策。",
+    "川又賢治": "ダート戦やローカル開催で伏兵馬を上位に導く。",
+    "原田和真": "関東の中堅。後方からの直線一気など思い切りが良い。",
+    "柴田善臣": "大ベテラン。馬に負担をかけない丁寧で柔らかな騎乗。",
+    "江田照男": "大穴メーカー。忘れた頃の逃げやイン突きで波乱演出。",
+    "鮫島良太": "堅実な騎乗スタイル。ローカル開催で安定した成績。",
+    "柴田大知": "マイネル軍団の主戦。ダートの先行やタフな馬場が得意。",
+    "長岡禎仁": "穴を開ける伏兵騎手。ダート戦での思い切りに警戒。",
+    "荻野琢真": "関西の中堅。後方待機からの直線勝負が得意なタイプ。",
+    "高倉稜": "逃げ・先行での粘り込み。ローカル開催で存在感を示す。",
+    "井上敏樹": "障害戦やローカルで騎乗。一発の魅力に溢れる。",
+    "北村宏司": "関東のベテラン。イン突きやロスのない立ち回りが巧み。",
+    "森一馬": "障害戦のトップジョッキー。大舞台での勝負強さが光る。",
+    "川端海翼": "若手。減量を活かした思い切りの良い先行策が武器。",
+    "水沼元輝": "若手・障害戦でも活躍。積極的なポジション取り。",
+    "中村将之": "障害戦のベテラン。堅実な飛越とロスのないコース取り。",
+    "小野寺祐": "障害戦を中心に活躍。伏兵馬での粘り込みに警戒。",
+    "野中悠太": "関東の穴騎手。ダート戦での思い切った先行策に魅力。",
+    "加藤祥太": "関西の中堅。ダート戦で先行してしぶとい競馬をする。",
+    "黛弘人": "追い込み馬での直線一気。展開がハマれば怖い存在。",
+    "石神深一": "障害の絶対王者。数々の名馬を導いた圧倒的な技術。",
+    "泉谷楓真": "若手有望株。積極的な位置取りと最後まで追う姿勢。",
+    "バルザロ": "バルザローナ。世界的な名手。絶妙な仕掛けと力強さ。",
+    "橋木太希": "フレッシュな若手。減量を活かした強気のレース運び。",
+    "ジェルー": "短期免許。タイトな立ち回りと強靭な追いが武器。",
+    "川須栄彦": "関西の中堅。ダート戦の逃げ・先行で穴を開ける。",
+    "小林脩斗": "若手。減量を活かした積極的な前付けが持ち味。",
+    "小坂忠士": "障害戦のベテラン。安定感のある飛越で上位に食い込む。",
+    "大久保友": "障害やローカルで騎乗。積極的なレース運びが光る。",
+    "菅原隆一": "関東の中堅。後方待機からの追い込みで穴を開ける。",
+    "田中健": "関西のベテラン。伏兵馬での思い切った仕掛けに注意。",
+    "遠藤汰月": "若手のホープ。軽斤量を活かした積極的な前付け。",
+    "木幡育也": "木幡三兄弟。ダート短距離での思い切った先行策。",
+    "小林凌大": "関東の若手。減量を活かしたダートでの先行が得意。",
+    "城戸義政": "関西の中堅。ダートの先行や伏兵馬での一発に警戒。",
+    "渡辺竜也": "笠松のトップジョッキー。中央でも持ち前の腕力を発揮。",
+    "伊藤工真": "障害戦やローカルで騎乗。丁寧な立ち回りが光る。",
+    "黒岩悠": "障害戦のベテラン。確実な飛越で最後まで粘り込む。",
+    "金子光希": "障害戦を中心に活躍。伏兵馬での思い切った騎乗。",
+    "石川倭": "ホッカイドウ競馬の名手。中央のダートでも腕力発揮。",
+    "西谷誠": "障害戦のベテラン。タフなコースでのレース運びに長ける。",
+    "土田真翔": "フレッシュな若手。減量特典を活かした積極的な騎乗。"
+};
+/* ▼▼ ここから：調教師（厩舎）の特徴データベース ▼▼ */
+const TRAINER_FEATURES = {
+    "杉山晴紀": "ダートや牝馬で大活躍。三冠牝馬も育てた確かな仕上げとレース選択。",
+    "矢作芳人": "海外遠征も積極的。連闘や独自のローテで勝負掛かり。勝負根性を引き出す。",
+    "斎藤誠": "ダート路線や牝馬の育成に定評あり。ローカル開催でもコンスタントに活躍。",
+    "斉藤崇史": "若手トップクラス。クロノジェネシスなど芝の王道で大舞台に強い。",
+    "大竹正博": "独特のローテーションで大物食い。馬の成長に合わせた慎重な仕上げ。",
+    "藤原英昭": "馬の成長に合わせた慎重なローテ。高い勝率・連対率を誇るエリート厩舎。",
+    "池江泰寿": "ディープ産駒など良血馬の育成に長ける。王道ローテでクラシックを狙う。",
+    "上村洋行": "若手ながら急成長中。ダート戦や先行馬での粘り込みに高い手腕を見せる。",
+    "福永祐一": "元トップジョッキーの相馬眼。馬の心理を理解した丁寧なアプローチが光る。",
+    "友道康夫": "長距離・クラシックの王道。馬体をじっくり仕上げ、大舞台で結果を出す。",
+    "手塚貴久": "マイラーや牝馬の育成に定評あり。関東の有力ノーザンF馬を多数管理。",
+    "鹿戸雄一": "エフフォーリアなどを育成。馬の精神面を重視した丁寧な仕上げ。",
+    "高野友和": "ノーザンFしがらきとの連携。坂路でハードに鍛え上げ、タフな馬を作る。",
+    "大久保龍": "ダート重賞で無類の強さ。チュウワウィザードなど砂の猛者を育成。",
+    "上原佑紀": "新進気鋭の若手。柔軟な発想と積極的なレース選択で勝ち星を伸ばす。",
+    "寺島良": "ダート戦での勝率が高い。地方交流重賞でも無類の強さを発揮する。",
+    "松永幹夫": "牝馬の育成が得意。スマートなローテで馬の能力を最大限に引き出す。",
+    "栗田徹": "タイトルホルダーなどを育成。長距離やタフな馬場でのスタミナ勝負に強い。",
+    "堀宣行": "外人騎手とのコンビで勝負気配。徹底した馬体管理と無駄のない仕上げ。",
+    "加藤征弘": "ダート短距離〜マイルで活躍。仕上がり早で新馬戦からの好走も目立つ。",
+    "中舘英二": "元逃げ名手。管理馬もテンのスピードを活かした積極策が多い。",
+    "宮田敬介": "関東のホープ。ノーザンF天栄系の馬で圧倒的な勝率を誇る。",
+    "武幸四郎": "良血馬を丁寧に育てる。芝のマイル〜中距離でキレを引き出す。",
+    "加藤士津": "ローカル開催やダート戦で伏兵馬を上位に持ってくる腕がある。",
+    "中内田充": "休み明けの勝率が異常に高い。マイル〜中距離特化の超エリート厩舎。",
+    "佐藤悠太": "若手のホープ。ダートの短距離戦など、条件を絞った起用が光る。",
+    "伊藤圭三": "ダート路線特化。中山ダートなどタフな舞台や地方交流に強い。",
+    "高柳大輔": "ダート重賞で活躍。テーオーケインズなどを育てた砂の職人。",
+    "武英智": "新進気鋭。スプリント〜マイルでのスピード馬育成に定評あり。",
+    "木村哲也": "ノーザンF天栄との強力タッグ。ルメール騎手とのコンビは鉄板。",
+    "田中博康": "レモンポップなど。若手ながら圧倒的な勝率とダート適性を見抜く。",
+    "吉岡辰弥": "若手の実力派。ダートや先行馬の仕上げに定評があり、安定感抜群。",
+    "四位洋文": "元名手。馬の折り合いと直線の脚を引き出す丁寧な調教が特徴。",
+    "奥村豊": "関西の実力派。芝の中距離や牝馬の育成に長け、大舞台でも一発あり。",
+    "清水久詞": "キタサンブラックを育成。ハードな調教で馬を鍛え抜き、スタミナを強化。",
+    "田中克典": "若手厩舎。ダート戦やローカルで積極的なポジション取りを指示する。",
+    "高木登": "ウシュバテソーロなど、ダートの中長距離で世界レベルの馬を育てる。",
+    "小栗実": "フレッシュな視点。ダート戦や牝馬の限定戦でコンスタントに結果を出す。",
+    "西園翔太": "若手厩舎。短距離のスピード馬やダート戦での思い切った起用が目立つ。",
+    "林徹": "ソングラインなどを育成。芝のマイル路線で抜群の安定感を誇る。",
+    "浜田多実": "ローカル開催の鬼。人気薄の差し馬を突っ込ませる波乱の使者。",
+    "森秀行": "マル外やダート短距離。海外遠征・地方交流を積極的に狙うスピード派。",
+    "野中賢二": "ダート路線の重賞で活躍。先行してしぶといタフな馬を育てる。",
+    "森一誠": "若手有望株。ノーザン系クラブ馬などを丁寧に仕上げて勝ち星を稼ぐ。",
+    "河嶋宏樹": "新進気鋭。データに基づいた合理的なローテーションで勝負する。",
+    "松下武士": "レシステンシアなど。芝短距離〜マイルでのスピード勝負にめっぽう強い。",
+    "村田一誠": "元騎手の経験を活かし、ローカルやダートで馬の勝負根性を引き出す。",
+    "伊坂重信": "条件戦やダート短距離で穴を開ける。堅実な仕上げが持ち味。",
+    "安田翔伍": "オメガパフュームなど、ダートの中長距離で圧倒的な実績を持つ。",
+    "長谷川浩": "ナムラクレアなど。スプリント〜マイル路線でのスピード育成が光る。",
+    "黒岩陽一": "アスコリピチェーノなど。芝のマイル戦や若駒の仕上げに高い手腕。",
+    "杉山佳明": "若手。ダート戦や短距離での積極的な前付け指示で波乱を呼ぶ。",
+    "渡辺薫彦": "ナミュールなど。芝のマイル〜中距離で鋭い末脚を引き出す。",
+    "池添学": "良血馬を多数管理。芝の中距離戦での末脚勝負や休み明けに注意。",
+    "小林真也": "若手。ローカル開催やダート戦で伏兵馬を上位に持ってくる。",
+    "宮徹": "ベテラン。堅実なローテで人気薄を上位に持ってくる渋い手腕。",
+    "須貝尚介": "気性難の馬を大成させる。ソダシやゴルシなど、勝負所の仕上げは一級品。",
+    "鈴木慎太": "新進気鋭。ダートの短距離などでスピードを活かした仕上げが特徴。",
+    "大橋勇樹": "ダート路線を中心に活躍。タフなコースでの粘り込みに期待。",
+    "田村康仁": "メジャーエンブレムなど。芝のマイル戦や逃げ馬の育成に定評。",
+    "中村直也": "若手。ローカル開催でコツコツと勝ち星を重ねる堅実派。",
+    "橋口慎介": "芝の中距離や長距離でじっくりと馬を育て、大舞台に送り出す。",
+    "高橋一哉": "若手。ダート戦や先行馬の仕上げに定評があり、穴を開けることも。",
+    "田島俊明": "ローカル開催や小回りコースでの器用な立ち回りを仕込む。",
+    "竹内正洋": "ダート短距離で高い勝率。スタートから押し切るスピード馬が多い。",
+    "武井亮": "関東の中堅。条件戦やダートで穴を開ける一発がある。",
+    "岩戸孝樹": "ダート路線に強い。積極的なレース運びとタフな仕上げ。",
+    "角田晃一": "ダート路線に強い。積極的な先行策で押し切る競馬を好む。",
+    "久保田貴": "芝のマイル〜中距離で活躍。牝馬の仕上げや休み明けの好走が目立つ。",
+    "東田明士": "ダートの中距離でしぶとい馬を育てる。人気薄での激走に注意。",
+    "千田輝彦": "短距離〜マイル路線。スピードを活かした逃げ・先行馬の育成。",
+    "尾形和幸": "ローカル開催で活躍。ダートの短距離戦でコンスタントに結果を出す。",
+    "蛯名正義": "元トップジョッキー。馬の折り合いと直線の仕掛けを重視した丁寧な仕上げ。",
+    "高橋亮": "芝ダート問わず短距離でのスピード勝負に強い。先行力が武器。",
+    "石橋守": "メイショウサムソンなど。芝の中長距離でクラシックを狙う王道ローテ。",
+    "北出成人": "ダート路線で渋い活躍。タフな馬場でのスタミナ勝負に持ち込む。",
+    "鈴木孝志": "牝馬の育成や小回りコースでの立ち回りに定評がある。",
+    "千葉直人": "若手。ダート戦での積極的な起用や、ローカルでの伏兵馬に警戒。",
+    "高柳瑞樹": "スターズオンアースなど。牝馬の育成と大舞台での究極の仕上げ。",
+    "奥村武": "芝の中長距離や洋芝で結果を出す。馬の成長に合わせたローテ。",
+    "宮地貴稔": "ローカル開催やダート戦で存在感。堅実な仕上げで穴を開ける。",
+    "中竹和也": "ベテラン。芝・ダート問わず中距離での安定したレース運び。",
+    "牧浦充徳": "ダート路線で活躍。先行して粘り込むタフな馬を多く育てる。",
+    "小崎憲": "芝の短距離〜マイルでスピードを活かす。海外遠征も経験あり。",
+    "辻野泰之": "マスクトディーヴァなど。角居厩舎の系譜を継ぎ、芝の王道で活躍。",
+    "高橋義忠": "ファインニードルなど。芝短距離のスプリント戦で圧倒的な実績。",
+    "吉村圭司": "クイーンズリングなど。芝のマイル〜中距離での牝馬育成に定評。",
+    "西田雄一": "元騎手。千直（新潟1000m）やローカル短距離での勝負気配に注意。",
+    "石坂公一": "ダート戦でしぶとい馬を作る。タフなコースでの粘り込みに期待。",
+    "茶木太樹": "若手。ダート短距離などでスピードを活かした積極策が目立つ。",
+    "今野貞一": "ダートの中距離路線で活躍。パワー型の馬をじっくり育てる。",
+    "藤岡健一": "ジュエラーなど。芝のマイル〜中距離で高い瞬発力を引き出す。",
+    "新谷功一": "リメイクなど。ダート短距離や海外遠征で圧倒的なスピードを見せる。",
+    "菊沢隆徳": "アエロリットなど。芝のマイル戦や逃げ・先行馬の育成に定評。",
+    "小椋研介": "若手のホープ。ダート戦やローカルで積極的なレース運びを指示する。",
+    "前川恭子": "女性調教師。きめ細やかなケアで馬の能力を最大限に引き出す。",
+    "庄野靖志": "スワーヴリチャードなど。芝の中長距離でスケールの大きな馬を育てる。",
+    "西村真幸": "芝・ダート問わず短距離〜マイルで高い勝率。スピード馬が多い。",
+    "嘉藤貴行": "元騎手。馬の個性に合わせた丁寧な仕上げでコンスタントに結果を出す。",
+    "辻哲英": "若手。ノーザン系クラブ馬などを管理し、芝のレースで高い勝率。",
+    "牧田和弥": "ダート路線や小回りコースで活躍。伏兵馬の一発に警戒が必要。",
+    "吉田直弘": "パンサラッサなど。芝の中長距離で圧倒的な逃げ馬やタフな馬を育てる。",
+    "鈴木伸尋": "ローカル開催やダート戦で渋い活躍。堅実な仕上げが持ち味。",
+    "金成貴史": "ダート戦や短距離で穴を開ける。スタートからのスピード勝負に強い。",
+    "岡田稲男": "タイトルホルダーなど。馬の闘争心を引き出すハードな調教。",
+    "萩原清": "ノームコアなど。芝のマイル〜中距離でスピードと持続力を強化。",
+    "池上昌和": "ローカル開催や小回りでの立ち回りの上手さを仕込む。",
+    "畠山吉宏": "ウインブライトなど。中山や洋芝といったタフなコースで無類の強さ。",
+    "笹田和秀": "ベテラン。馬に負担をかけないローテで長持ちさせる。",
+    "坂口智康": "障害戦やローカル開催で存在感。タフな馬を作る。",
+    "矢野英一": "ダート短距離やマイル戦で活躍。スピードを活かした仕上げ。",
+    "小笠倫弘": "条件戦やローカルで穴を開ける。堅実なローテーション。",
+    "古賀慎明": "芝のマイル〜中距離で活躍。牝馬の仕上げに定評がある。",
+    "矢嶋大樹": "若手。ダート戦での積極的な起用や穴馬の激走に注意。",
+    "上原博之": "ダイワメジャーなど。芝のマイル〜中距離で王道の先行馬を育てる。",
+    "稲垣幸雄": "ダート短距離で高い勝率。スタートからのスピードを重視。",
+    "小手川準": "ローカル開催やダート戦でコンスタントに結果を出す。",
+    "大根田裕": "ベテラン。人気薄の差し馬で波乱を演出する渋い手腕。",
+    "国枝栄": "アーモンドアイなど牝馬の育成は日本一。休み明けより叩いて良化する型。",
+    "杉浦宏昭": "ダート中長距離でタフな馬を育てる。ローカルでも活躍。",
+    "高橋康之": "ダートやローカル開催での伏兵馬に警戒が必要。",
+    "牧光二": "ダート戦や短距離でのスピード勝負。積極的な前付けを指示。",
+    "梅田智之": "レッツゴードンキなど。芝の短距離〜マイルでスピードを引き出す。",
+    "武藤善則": "ローカル開催やダートで穴を開ける。息子の武藤雅騎手とのコンビ。",
+    "武市康男": "ダート戦を中心に手堅く勝ち星を拾う。先行馬の粘り込み。",
+    "水野貴広": "中山などのタフなコースやダート戦で強さを発揮する。",
+    "尾関知人": "グローリーヴェイズなど。海外遠征や芝の中長距離で大舞台に強い。",
+    "本田優": "元名手。馬の折り合いと勝負所での反応を重視した仕上げ。",
+    "伊藤大士": "ダート短距離やローカル開催でスピード馬を活躍させる。",
+    "平田修": "カレンブラックヒルなど。芝のマイル〜中距離で先行馬を育てる。",
+    "谷潔": "ベテラン。ダート戦や小回りコースでの伏兵馬に注意。",
+    "田中剛": "ロゴタイプなど。芝のマイル〜中距離でスピードと底力を引き出す。",
+    "藤野健太": "若手。ダート戦での積極的なレース選択で穴を開ける。",
+    "中尾秀正": "ダート路線でタフな馬を育てる。地方交流重賞でも活躍。",
+    "小島茂之": "ブラックエンブレムなど。芝のマイル戦で高いスピード能力を発揮。",
+    "秋山真一": "元騎手。馬の個性を活かした丁寧な調教でローカルで結果を出す。",
+    "昆貢": "ヒルノダムールなど。馬の自主性を重んじる独自の調教スタイル。",
+    "羽月友彦": "ダート中長距離でタフなスタミナ馬をじっくりと育てる。",
+    "青木孝文": "ローカル開催やダート戦でコンスタントに勝ち星を稼ぐ。",
+    "浅利英明": "若手。条件戦やダート短距離でスピード馬を起用する。",
+    "荒川義之": "ダート戦や小回りコースでの器用な立ち回りを仕込む。",
+    "萱野浩二": "ダート路線で渋い活躍。人気薄での逃げ・先行に警戒。",
+    "天間昭一": "ローカル開催やダート戦で穴を開ける伏兵馬を育てる。",
+    "佐々木晶": "アップトゥデイトなど。障害戦やタフなダート戦で圧倒的な実績。",
+    "中川公成": "条件戦やダート短距離でスピードを活かした仕上げ。",
+    "宮本博": "ダート重賞で活躍。先行して粘り強いパワー馬を多く管理。",
+    "飯田祐史": "ダート短距離〜マイルで活躍。スピードとパワーを両立。",
+    "菊川正達": "ローカル開催やダート戦で伏兵馬を上位に食い込ませる。",
+    "安達昭夫": "スマートファルコンなど。ダートの短距離〜マイルで高いスピード。",
+    "小野次郎": "元騎手。ダート戦やローカルでの積極的なレース運びを指示。",
+    "緒方努": "若手。ダート戦での積極的な起用や、ローカルでの伏兵に注意。",
+    "加藤公太": "若手。条件戦やダート短距離でスピード馬を起用する。",
+    "奥平雅士": "ダートの中長距離でタフな馬を育てる。ローカルでも活躍。",
+    "新開幸一": "ローカル開催やダート戦でコンスタントに結果を出す。",
+    "柴田卓": "若手。ダート戦での積極的なレース選択で穴を開ける。",
+    "蛯名利弘": "ダート路線で渋い活躍。人気薄での逃げ・先行に警戒。",
+    "相沢郁": "ヴェルデグリーンなど。芝の中長距離でクラシックを狙う王道ローテ。",
+    "西園正都": "サダムパテックなど。ダートの短距離〜マイルで無類のスピード。",
+    "勢司和浩": "ローカル開催やタフな馬場でのスタミナ勝負に持ち込む。",
+    "粕谷昌央": "条件戦やダート短距離でスピードを活かした仕上げ。",
+    "橋田宜長": "サイレンススズカなどを育てた名門の系譜。芝の中距離で活躍。",
+    "大和田成": "ダート路線や小回りコースで活躍。伏兵馬の一発に警戒が必要。",
+    "井上智史": "若手。ダート戦での積極的な起用や、ローカルでの伏兵に注意。",
+    "和田勇介": "ダート短距離で高い勝率。スタートから押し切るスピード馬が多い。",
+    "田中勝春": "元名手。馬の気持ちを理解した柔らかな調教で能力を引き出す。",
+    "深山雅史": "ローカル開催や小回りでの立ち回りの上手さを仕込む。",
+    "畑端省吾": "元騎手。ダート戦やローカルでの積極的なレース運びを指示。",
+    "本間忍": "条件戦やローカルで穴を開ける。堅実なローテーション。",
+    "松山将樹": "ダート路線でタフな馬を育てる。地方交流重賞でも活躍。",
+    "和田正一": "芝の中長距離でじっくりと馬を育て、タフなコースで結果を出す。",
+    "小西一男": "ダート短距離〜マイルで活躍。スピードとパワーを両立。",
+    "堀内岳志": "条件戦やローカルで穴を開ける。堅実なローテーション。",
+    "高橋文雅": "ローカル開催やダート戦で伏兵馬を上位に食い込ませる。",
+    "松尾卓哉": "若手。ダート戦での積極的なレース選択で穴を開ける。",
+    "和田雄二": "条件戦やダート短距離でスピードを活かした仕上げ。",
+    "戸田博文": "フェノメノなど。芝の中長距離でスケールの大きな馬を育てる。",
+    "松永康利": "ローカル開催やタフな馬場でのスタミナ勝負に持ち込む。",
+    "森田直行": "メロディーレーンなど。芝ダート問わず短距離のスピード勝負に強い。",
+    "柄崎将寿": "条件戦やダート短距離でスピードを活かした仕上げ。",
+    "秋本大介": "若手。ダート戦での積極的な起用や、ローカルでの伏兵に注意。",
+    "平岩大典": "若手。ローカル開催やダート戦でコンスタントに結果を出す。",
+    "室井潔": "条件戦やローカルで穴を開ける。堅実なローテーション。",
+    "石栗龍彦": "ダート路線で渋い活躍。人気薄での逃げ・先行に警戒。",
+    "伊藤伸一": "ローカル開催やダート戦でコンスタントに結果を出す。",
+    "佐藤吉勝": "ダート路線でタフな馬を育てる。地方交流重賞でも活躍。",
+    "土田稔": "ダート短距離で高い勝率。スタートから押し切るスピード馬が多い。",
+    "根本康広": "女性騎手を積極的に起用。逃げ・先行でアッと言わせる大穴演出。",
+    "手塚貴徳": "若手。ダート戦での積極的なレース選択で穴を開ける。",
+    "加藤和宏": "元名手。馬の個性を活かした丁寧な調教でローカルで結果を出す。",
+    "的場均": "元名手。馬の折り合いと勝負所での反応を重視した仕上げ。",
+    "清水英克": "条件戦やダート短距離でスピードを活かした仕上げ。",
+    "古賀大生": "ローカル開催や小回りでの立ち回りの上手さを仕込む。",
+    "グラファ": "外国馬。欧州や米国の圧倒的なタフネスとスピードを持ち込む。",
+    "南田美知": "ローカル開催やダート戦でコンスタントに結果を出す。",
+    "池田忠好": "地方競馬からの刺客。ダート戦で中央馬を脅かすタフネス。",
+    "小野望": "ホッカイドウ競馬の名門。2歳戦やダート短距離のスピードは中央級。",
+    "村上正和": "地方競馬の雄。中央のダート戦でも引けを取らないパワー馬。",
+    "角川秀樹": "ホッカイドウ競馬のトップ。2歳ダート戦や短距離での圧倒的スピード。",
+    "川島洋人": "地方からの遠征馬。ダート戦での積極的な先行策に警戒。",
+    "河津裕昭": "地方競馬の実力派。中央のタフなダートでも粘り込む底力。"
+};
+/* ▲▲ ここまで：調教師（厩舎）の特徴データベース ▲▲ */
+
+
+/* =========================================================
+   グローバル変数
+========================================================= */
+let horses = [];
+// ▼ 修正：初期値を空白から「ー」に変更し、直感的に触れるように
+const markList = ['ー', '◎', '〇', '▲', '△', '☆', '★', '注', '消']; 
+
+// ▼ 券種ごとに買い目と状態を記憶する ▼
+let builderState = {
+  "馬連": { axis: [], opp1: [], opp2: [], tickets: [] },
+  "ワイド": { axis: [], opp1: [], opp2: [], tickets: [] },
+  "3連複": { axis: [], opp1: [], opp2: [], tickets: [] },
+  "3連単": { axis: [], opp1: [], opp2: [], tickets: [] }
+};
+
+let sameRaceKeysMap = {};
+let raceInfo = { basho: "", num: "", title: "", track: "", dist: "" };
+
+/* =========================================================
+/* =========================================================
+   1. テキスト解析処理
+========================================================= */
+function parseText() {
+  let rawText = document.getElementById('jra-input').value.trim();
+  if (!rawText) return;
+
+  rawText = rawText.replace(/[０-９ａ-ｚＡ-Ｚ]/g, function(s) {
+      return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  }).replace(/（/g, '(').replace(/）/g, ')')
+    .replace(/⽗/g, '父').replace(/⺟/g, '母')
+    .replace(/⼩/g, '小').replace(/⼤/g, '大').replace(/⽥/g, '田')
+    .replace(/⼭/g, '山').replace(/⽊/g, '木').replace(/⽔/g, '水')
+    .replace(/⼟/g, '土').replace(/⾦/g, '金').replace(/⽩/g, '白')
+    .replace(/⿊/g, '黒').replace(/⾚/g, '赤').replace(/⻘/g, '青')
+    .replace(/⻑/g, '長').replace(/⾕/g, '谷').replace(/⽯/g, '石')
+    .replace(/⻄/g, '西').replace(/⾼/g, '高');
+
+  horses = []; sameRaceKeysMap = {};
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== "");
+
+  raceInfo = { basho: "", num: "", title: "", track: "", dist: "" };
+
+  for(let i=0; i<Math.min(30, lines.length); i++) {
+    // ▼ 修正：「阪神11R エニフステークス」のようにRの横にタイトルがある場合も取得する
+    let bashoNumMatch = lines[i].match(/^(札幌|函館|福島|新潟|中山|東京|中京|京都|阪神|小倉)(\d+)R(?:\s+(.+))?/);
+    if (bashoNumMatch && !raceInfo.basho) {
+        raceInfo.basho = bashoNumMatch[1];
+        raceInfo.num = bashoNumMatch[2] + "R";
+        if(bashoNumMatch[3]) raceInfo.title = bashoNumMatch[3].trim();
+    }
+
+    let tMatch = lines[i].match(/\d+回[^\d]+\d+日\d+R\s+(.+)/);
+    if (tMatch) {
+        raceInfo.title = tMatch[1].trim();
+    } else if (bashoNumMatch && !raceInfo.title) {
+        let nextLine = lines[i+1] ? lines[i+1].trim() : "";
+        if (nextLine && !nextLine.includes("コース") && !nextLine.includes("本賞金")) {
+            raceInfo.title = nextLine.split('(')[0].trim(); 
+        }
+    }
+
+    let dMatch = lines[i].match(/コース\s*(\d+)m\s*(芝|ダート|ダ|障)/);
+    if(dMatch) { 
+        raceInfo.dist = dMatch[1]; 
+        raceInfo.track = dMatch[2].charAt(0) === 'ダ' ? 'ダート' : dMatch[2].charAt(0); 
+    }
+  }
+  
+  if(!raceInfo.basho) raceInfo.basho = "不明";
+  if(!raceInfo.num) raceInfo.num = "11R"; 
+  if (raceInfo.track === 'ダート') document.documentElement.style.setProperty('--table-header', '#78350f'); 
+  else document.documentElement.style.setProperty('--table-header', '#166534');
+
+   document.getElementById('rt-basyo').textContent = raceInfo.basho + raceInfo.num;
+  document.getElementById('rt-name').textContent = raceInfo.title;
+  
+  // ▼ 基準タイムを取得してコース情報の横に表示する処理 ▼
+  let stTime = getStandardTime(raceInfo.basho, raceInfo.track, raceInfo.dist, raceInfo.title);
+  if (stTime && stTime !== '-') {
+      document.getElementById('rt-course').innerHTML = `${raceInfo.track}${raceInfo.dist}m <span style="color:#fde047; margin-left:8px; font-size:11px;">(基準: ${stTime})</span>`;
+  } else {
+      document.getElementById('rt-course').textContent = raceInfo.track + raceInfo.dist + "m";
+  }
+  
+  document.getElementById('race-title-display').style.display = 'flex'; 
+
+  document.getElementById('btn-back').style.display = 'block';
+
+  let courseKey = `${raceInfo.basho}_${raceInfo.track}_${raceInfo.dist}m`;
+  let courseKeyOut = `${raceInfo.basho}_${raceInfo.track}_${raceInfo.dist}m_外`; 
+  let featureText = COURSE_FEATURES[courseKeyOut] || COURSE_FEATURES[courseKey] || "データがありません。";
+  document.getElementById('cf-text').textContent = featureText;
+  document.getElementById('course-feature').style.display = 'block';
+
+  let raceCounts = {};
+  let invSumDefault = 0; 
+
+  for (let i = 0; i < lines.length; i++) {
+    let waku = null, num = null, name = "不明", odds = 99.9;
+    let isHorseStart = false;
+
+                 let matchA = lines[i].match(/^(\d+)\s+(\d+)$/);
+    if (matchA) {
+        waku = parseInt(matchA[1], 10);
+        num = parseInt(matchA[2], 10);
+        let nameLine = lines[i+1];
+        if (nameLine) {
+            // 名前とオッズがくっついていても読み取る
+            let nameOddsMatch = nameLine.match(/^(.+?)\s*(\d+\.\d+)\s*\(/);
+            if (nameOddsMatch) {
+                name = nameOddsMatch[1].trim();
+                odds = parseFloat(nameOddsMatch[2]);
+                isHorseStart = true;
+            }
+        }
+    } 
+        else if (lines[i].match(/^(\d+)$/) && lines[i+1]) {
+        // 名前とオッズがくっついていても読み取る
+        let matchB = lines[i+1].match(/^(\d+)\s+(.+?)\s*(\d+\.\d+)\s*\(/);
+        if (matchB) {
+            waku = parseInt(lines[i].trim(), 10);
+            num = parseInt(matchB[1], 10);
+            name = matchB[2].trim();
+            odds = parseFloat(matchB[3]);
+            isHorseStart = true;
+            i++; 
+        }
+    }
+
+    if (!isHorseStart || num === null || num < 1 || num > 18 || waku > 8) continue;
+
+
+
+
+    let sire="不明", jockeyName = "不明", trainerName = "不明";
+    for (let j=1; j<=10; j++) {
+        let l = lines[i+j];
+        if (!l || l.match(/^(\d+)\s+(\d+)$/) || l.match(/^(\d+)$/)) break; 
+        
+                   if (l.match(/^父\s*(.+)/)) {
+            sire = l.match(/^父\s*(.+)/)[1].trim();
+            // ▼ 修正：「母」という文字が含まれる場合はそこで分割して切り捨てる
+            sire = sire.replace('（', '(').split('(')[0].split('母')[0].trim();
+        }
+
+        
+                // ▼ 修正：斤量（40〜60kg台）の横にある文字だけを騎手名として拾う（日付などを弾く）
+        let kgMatch = l.match(/(4\d\.\d|[5-6]\d\.\d)(?:kg)?(.*)$/);
+        if (kgMatch) {
+            let jName = kgMatch[2].trim();
+            if (!jName && lines[i+j+1]) { 
+                let nextLine = lines[i+j+1].trim();
+                if (!nextLine.match(/^\d/)) { // 数字始まり（日付やタイム）を完全に弾く
+                    jName = nextLine;
+                }
+            }
+            if (jName && !jName.match(/^\d/)) { // 拾った文字が数字から始まっていたら弾く
+                jockeyName = jName.split(/[\s ]+/)[0].replace(/^[☆★△▲◇◆]/, '').trim();
+            }
+        }
+
+
+
+        
+        if (l.includes('（栗東）') || l.includes('（美浦）') || l.includes('(栗東)') || l.includes('(美浦)')) {
+            let namePart = l.replace(/（[栗美]東）|\([栗美]東\)/g, '').trim();
+            let nameArr = namePart.split(/[\s ]+/);
+            if(nameArr.length >= 2) {
+                trainerName = nameArr[nameArr.length-2] + nameArr[nameArr.length-1];
+            } else {
+                trainerName = nameArr[0];
+            }
+        }
+    }
+
+    let races = [];
+    let avgPosSum = 0; let avgPosCount = 0; 
+
+    for (let j=1; j<=30; j++) {
+        let l = lines[i+j];
+        if (!l || l.match(/^(\d+)\s+(\d+)$/) || l.match(/^(\d+)$/)) break;
+
+        if (l.match(/^\d{4}\.\d{2}\.\d{2}/)) {
+            let l1 = lines[i+j], l2 = lines[i+j+1], l3 = lines[i+j+2], l4 = lines[i+j+3], l5 = lines[i+j+4];
+            let rank = "-", title = "-", time = "-", agari = "-", passOrder = "", rDate = "", rPlace = "";
+            let timeSec = 999.9, agariSec = 99.9;
+            let margin = "-";
+            
+            if(l1) {
+                let dMatch = l1.match(/^(\d{4}\.\d{2}\.\d{2})/);
+                if(dMatch) rDate = dMatch[1].substring(2);
+            }
+            if(l2) {
+                let pMatch = l2.match(/^(札幌|函館|福島|新潟|中山|東京|中京|京都|阪神|小倉)/);
+                if(pMatch) rPlace = pMatch[1];
+                title = l2.replace(rPlace, '').trim();
+            }
+            if(l3) {
+                let rkMatch = l3.match(/^(\d+)着/);
+                if(rkMatch) rank = rkMatch[1];
+            }
+            if(l5) {
+                let tmMatch = l5.match(/(\d{1,2}):(\d{2}\.\d)/);
+                if(tmMatch) {
+                    time = tmMatch[1] + ":" + tmMatch[2];
+                    timeSec = parseInt(tmMatch[1]) * 60 + parseFloat(tmMatch[2]);
+                }
+                
+                let agMatch = l5.match(/3F\s*(\d{2}\.\d)/);
+                if(agMatch) {
+                    agari = agMatch[1];
+                    agariSec = parseFloat(agari);
+                }
+                
+                              let passMatch = l5.match(/(\d+-\d+(?:-\d+)*)\s+3F/);
+                if(passMatch) {
+                    passOrder = passMatch[1];
+                    let positions = passOrder.split('-').map(Number);
+                    let posAvg = positions.reduce((a, b) => a + b, 0) / positions.length;
+                    avgPosSum += posAvg;
+                    avgPosCount++;
+                }
+            }
+            
+                      // ▼ 修正：着差と「勝ち馬名（自身が1着なら2着馬）」を確実に拾う
+            let marginLine = "";
+            if (l5 && l5.match(/\((-?\d+\.\d+)\)/)) marginLine = l5;
+            else if (lines[i+j+5] && lines[i+j+5].match(/\((-?\d+\.\d+)\)/)) marginLine = lines[i+j+5];
+            else if (lines[i+j+6] && lines[i+j+6].match(/\((-?\d+\.\d+)\)/)) marginLine = lines[i+j+6];
+            
+            let winner = "-";
+            if (marginLine) {
+                // 行の先頭からカッコまでの文字を馬名として取得
+                let mMatch = marginLine.match(/^(.+?)\s*\((-?\d+\.\d+)\)/);
+                if (mMatch) {
+                    winner = mMatch[1].trim();
+                    margin = mMatch[2];
+                } else {
+                    let mMatch2 = marginLine.match(/\((-?\d+\.\d+)\)/);
+                    if(mMatch2) margin = mMatch2[1];
+                }
+            }
+
+            let raceKey = `${rDate}_${rPlace}_${title.replace(/\s+/g, '')}`;
+            if (rDate && rPlace) raceCounts[raceKey] = (raceCounts[raceKey] || 0) + 1;
+
+            // races.push の中に winner を追加
+            if (rank !== "-") races.push({ rank, margin, winner, rDate, rPlace, title, passOrder, time, timeSec, agari, agariSec, raceKey });
+            j += 4; 
+        }
+
+    }
+    
+    let style = "差", styleVal = 3, avgPosDisp = "-";
+    if(avgPosCount > 0) {
+        let avg = avgPosSum / avgPosCount;
+        avgPosDisp = avg.toFixed(1); // ▼ 追加：平均通過順を保存
+        if(avg <= 3.0) { style = "逃"; styleVal = 1; }
+        else if(avg <= 6.5) { style = "先"; styleVal = 2; }
+        else if(avg <= 10.5) { style = "差"; styleVal = 3; }
+        else { style = "追"; styleVal = 4; }
+    }
+    
+    invSumDefault += (1 / odds); 
+    horses.push({ 
+        num, waku, name, odds, sire, jockeyName, trainerName, 
+        races, inputMark: 'ー', style, styleVal, avgPosDisp, // ▼ 修正：初期印を「ー」に
+        pWin: 0, pRen: 0, pFuku: 0, 
+        campData: null
+    });
+  }
+
+  if (horses.length === 0) {
+      alert("出馬表データを読み取れませんでした。JRA公式サイトの出馬表（過去走付き）を全選択してコピーしてください。"); return;
+  }
+
+  let groupIndex = 1;
+  for (let key in raceCounts) { 
+      if (raceCounts[key] >= 2) { 
+          sameRaceKeysMap[key] = groupIndex; 
+          groupIndex = (groupIndex % 4) + 1;
+      } 
+  }
+
+     // ▼ 修正：勝率の初期値を「80 ÷ 単勝オッズ」にする
+  horses.forEach(h => { 
+    let val = 80 / h.odds;
+    h.pWin = isNaN(val) ? 0 : val;
+  });
+  
+  // calcHarvilleInternal(); ←★この行を消すかコメントアウトする★
+  calcBestTimes();
+
+  renderDashboard();
+  renderBuyBuilderUI();
+  initSortable();
+  generateRaceCommentary();
+  
+   document.getElementById('screen-init').classList.remove('active');
+  document.getElementById('screen-main').classList.add('active');
+}
+
+// ▼ ここから：消えてしまったAI見解生成関数を復活させる ▼
+function generateRaceCommentary() {
+    let comment = "";
+    let sortedHorses = [...horses].sort((a, b) => a.odds - b.odds);
+    let fav = sortedHorses[0];
+    let fav2 = sortedHorses[1];
+    let nigeCount = horses.filter(h => h.styleVal === 1).length;
+    let pace = (nigeCount >= 3) ? "ハイペース必至" : (nigeCount === 0 ? "スロー濃厚" : "淀みない流れ");
+    let bestAgariHorse = null;
+    
+    horses.forEach(h => { h.races.forEach(r => { if (r.isBestAgari) bestAgariHorse = h.name; }); });
+    
+    if (fav && fav.odds <= 2.5) {
+        comment += `【${pace}】単勝オッズ${fav.odds.toFixed(1)}倍の${fav.name}が完全に抜けた存在で盤石の態勢。`;
+    } else if (fav && fav.odds >= 4.0) {
+        comment += `【波乱含みの混戦】確たる中心馬が不在でオッズも割れており、展開や位置取り一つで大きく着順が入れ替わる難解なレース。`;
+    } else {
+        comment += `【上位拮抗】${fav ? fav.name : ''}と${fav2 ? fav2.name : '上位陣'}を中心とした力勝負。`;
+    }
+    
+    if (nigeCount >= 3) {
+        comment += `\n逃げ馬が${nigeCount}頭揃っており、先行争いが激化すれば差し・追込馬に展開が向く可能性が高い。`;
+    } else if (nigeCount === 0) {
+        comment += `\n明確な逃げ馬がおらずペースは落ち着きそう。前目につけられる馬の残り目に注意が必要。`;
+    } else if (nigeCount === 1) {
+        comment += `\n逃げ馬は1頭のみ。単騎マイペースで運べればそのまま前残りするシーンも十分にある。`;
+    }
+    
+    if (bestAgariHorse && (!fav || bestAgariHorse !== fav.name)) {
+        comment += `また、過去走でメンバー最速の上がりを記録している${bestAgariHorse}の末脚・強襲には要警戒。`;
+    }
+    
+    let memoEl = document.getElementById('race-memo');
+    if (memoEl) memoEl.value = comment;
+}
+// ▲ ここまで ▲
+
+/* =========================================================
+   確率計算 (Harville Model)
+========================================================= */
+// ▼ 追加：手動でいじったグラフの比率を保ったまま、合計を100%に自動補正する機能
+function normalizeTo100() {
+    let sumP = 0;
+    horses.forEach(h => sumP += h.pWin);
+    if (sumP > 0) {
+        horses.forEach((h, index) => {
+            let newVal = (h.pWin / sumP) * 100;
+            updateGraphVal(index, newVal); // グラフの見た目も更新
+        });
+    }
+}
+
+function calculateHarville() {
+    // ▼ 追加：合計が100%になるように全員の勝率を自動補正（ノーマライズ）する
+    let sumP = 0;
+    horses.forEach(h => sumP += h.pWin);
+    if (sumP > 0) {
+        horses.forEach(h => h.pWin = (h.pWin / sumP) * 100);
+    }
+    
+    // 設定した勝率（pWin）を元に連対・複勝を再計算
+    calcHarvilleInternal();
+    renderTables(); 
+    calcBuilder();  
+}
+
+
+function calcHarvilleInternal() {
+    const n = horses.length;
+    const P = horses.map(h => h.pWin / 100);
+    
+    for(let i = 0; i < n; i++) {
+        let p_i = P[i];
+        if(p_i <= 0) {
+            horses[i].pRen = 0; horses[i].pFuku = 0;
+            continue;
+        }
+        
+        let p_2nd = 0, p_3rd = 0;
+        for(let j = 0; j < n; j++) {
+            if(i === j) continue;
+            let p_j = P[j];
+            if(1 - p_j <= 0) continue;
+            p_2nd += p_j * (p_i / (1 - p_j));
+            
+            for(let k = 0; k < n; k++) {
+                if(k === i || k === j) continue;
+                let p_k = P[k];
+                if(1 - p_j - p_k <= 0) continue;
+                p_3rd += p_j * (p_k / (1 - p_j)) * (p_i / (1 - p_j - p_k));
+            }
+        }
+        horses[i].pRen = (p_i + p_2nd) * 100;
+        horses[i].pFuku = (p_i + p_2nd + p_3rd) * 100;
+    }
+}
+
+/* =========================================================
+   UI描画・イベント
+========================================================= */
+function calcBestTimes() {
+    let minTime = 999.9, minAgari = 99.9;
+    horses.forEach(h => {
+        h.races.forEach(r => {
+            if(r.timeSec < minTime) minTime = r.timeSec;
+            if(r.agariSec < minAgari) minAgari = r.agariSec;
+        });
+    });
+
+    horses.forEach(h => {
+        h.races.forEach(r => {
+            r.isBestTime = (r.timeSec === minTime);
+            r.isBestAgari = (r.agariSec === minAgari);
+        });
+    });
+}
+
+function generateRaceHtml(race) {
+  if (!race) return '<div class="past-empty" style="color:#cbd5e1; display:flex; align-items:flex-start; justify-content:center; height:100%; font-size:9px; padding-top:4px;">---</div>';
+  
+  let rankClass = "rank-other"; let rNum = parseInt(race.rank);
+  if (rNum === 1) rankClass = "rank-1"; 
+  else if (rNum === 2) rankClass = "rank-2"; 
+  else if (rNum === 3) rankClass = "rank-3";
+  
+  let sameGroupClass = ""; if (sameRaceKeysMap[race.raceKey]) sameGroupClass = "same-group-" + sameRaceKeysMap[race.raceKey];
+  let timeClass = race.isBestTime ? "is-best-time" : "";
+  let agariClass = race.isBestAgari ? "is-best-agari" : "";
+  
+  let mStrFormatted = "";
+  if (race.margin && race.margin !== "-") {
+      let mVal = parseFloat(race.margin);
+      let mStr = mVal < 0 ? race.margin : Math.abs(mVal).toFixed(1);
+      let mColor = mVal < 0 ? "#2563eb" : "#64748b"; 
+      mStrFormatted = `<span style="color:${mColor};">(${mStr})</span>`;
+  }
+
+  let winnerDisp = "";
+  if (race.winner && race.winner !== "-") {
+      let trueWinner = race.winner.trim().split(/[\s ]+/).pop();
+      winnerDisp = `<div style="font-size:8px; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px; line-height:1.0;">勝:${trueWinner} ${mStrFormatted}</div>`;
+  } else if (mStrFormatted) {
+      winnerDisp = `<div style="font-size:8px; color:#475569; line-height:1.0;">着差 ${mStrFormatted}</div>`;
+  }
+
+  return `
+    <!-- ▼ 修正：justify-content: flex-start にして上詰めにする ▼ -->
+    <div class="past-cell ${rNum<=3?'is-rank-'+rNum:''} ${sameGroupClass} ${timeClass} ${agariClass}" style="display: flex; flex-direction: column; justify-content: flex-start; height: 100%; gap: 0px; padding: 2px 1px;">
+      
+      <div style="font-size:8px; color:#64748b; font-weight:bold; letter-spacing:-0.5px; line-height:1.0; margin-bottom:1px;">${race.rDate} ${race.rPlace}</div>
+      
+      <div style="font-size:9px; font-weight:900; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:-0.5px; line-height:1.0; margin-bottom:1px;">${race.title}</div>
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; line-height:1.0; margin-bottom:1px;">
+        <span class="pc-rank ${rankClass}" style="padding:0 2px; font-size:8px; border-radius:1px;">${race.rank}着</span>
+        <span style="font-size:9px; font-weight:900; color:#1e293b; letter-spacing:-0.5px;">${race.time}</span>
+      </div>
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; font-size:8px; font-weight:bold; letter-spacing:-0.5px; color:#334155; line-height:1.0; margin-bottom:1px;">
+        <span style="background:#f1f5f9; border:1px solid #cbd5e1; padding:0 1px; border-radius:1px;">${race.passOrder||'-'}</span>
+        <span>上${race.agari}</span>
+      </div>
+      
+      ${winnerDisp}
+    </div>
+  `;
+}
+
+function renderTables() {
+  const tPast = document.getElementById('past-list'); tPast.innerHTML = '';
+  const gRows = document.getElementById('graph-rows'); gRows.innerHTML = '';
+
+  ['Nige', 'Senko', 'Sashi', 'Oikomi'].forEach(id => document.getElementById(`pos${id}`).innerHTML = '');
+
+  let totalWinP = 0;
+
+  horses.forEach((h, index) => {
+    totalWinP += h.pWin;
+
+    let markBg = h.inputMark === '◎' ? '#ea580c' : (h.inputMark !== 'ー' ? '#000' : '#f8fafc'); 
+    let markCol = h.inputMark === 'ー' ? '#64748b' : '#fff';
+    let markBorder = h.inputMark === 'ー' ? 'border: 1px dashed #cbd5e1;' : 'border: 1px solid transparent;';
+    
+    let oddsVal = parseFloat(h.odds);
+    let oddsColor = (!isNaN(oddsVal) && oddsVal < 10.0) ? "#ef4444" : "#1e293b";
+    let oddsDisplay = isNaN(oddsVal) ? '未定' : `<span style="color:${oddsColor}; font-weight:900;">${oddsVal.toFixed(1)}倍</span>`;
+    
+         let jockeyHtml = h.jockeyName;
+
+       // ▼ 今回追加した部分：脚質と平均通過順（色なし・細字グレーでスッキリと） ▼
+    let posHtml = `<div style="font-size:8.5px; margin-top:3px; line-height:1.1; letter-spacing:-0.5px; color:#64748b;">
+                     [${h.style}] ${h.avgPosDisp}番手
+                   </div>`;
+
+
+
+    let trP = document.createElement('tr'); 
+    trP.innerHTML = `
+      <!-- ▼ 1列目：馬番・印・オッズ ▼ -->
+      <td style="padding: 1px; vertical-align: top;">
+        <div class="center-wrapper" style="padding:0; gap:1px; height:auto; justify-content: flex-start;">
+          <div class="waku waku-${h.waku}" style="width:20px; height:20px; font-size:12px; margin-bottom:1px;">${h.num}</div>
+          <div class="mark-select-wrapper" style="background:${markBg}; ${markBorder}; height:18px; width:28px; margin:0;">
+            <select class="mark-select sync-inputMark-${h.num}" style="color:${markCol}; font-size:11px; padding:0;" onchange="updateVal(${h.num},'inputMark',this.value)">
+              ${markList.map(m=>`<option style="color:#000;" ${h.inputMark===m?'selected':''}>${m}</option>`).join('')}
+            </select>
+          </div>
+          <div style="font-size:9px; text-align:center; font-weight:bold; letter-spacing:-0.5px; margin-top:2px;">${oddsDisplay}</div>
+        </div>
+      </td>
+      
+      <!-- ▼ 2列目：馬名と陣営データ ＋ 脚質・平均通過順 ▼ -->
+      <td style="padding: 1px; vertical-align: top;">
+        <div style="font-size:10px; font-weight:900; line-height:1.1; letter-spacing:-0.8px; margin-bottom:2px; white-space:nowrap; overflow:hidden;">
+          <span onclick="this.classList.toggle('horse-highlight');" style="cursor:pointer;">${h.name}</span>
+        </div>
+
+        <div onclick="showCampModal(${h.num})" style="cursor:pointer; font-size:8px; font-weight:bold; line-height:1.1; letter-spacing:-0.5px;">
+          <span style="color:#1e40af;">${jockeyHtml} / ${h.trainerName !== '不明' ? h.trainerName : ''}</span><br>
+          <span style="color:#92400e;">${h.sire}</span>
+        </div>
+        
+        <!-- ▼ ここに脚質バッジと平均通過順が表示されます ▼ -->
+        ${posHtml}
+      </td>
+
+
+      
+      <!-- ▼ 3列目以降：過去走 ▼ -->
+      <td class="col-past">${generateRaceHtml(h.races[0])}</td>
+      <td class="col-past">${generateRaceHtml(h.races[1])}</td>
+      <td class="col-past">${generateRaceHtml(h.races[2])}</td>
+      <td class="col-past col-race-4">${generateRaceHtml(h.races[3])}</td>
+    `;
+
+    tPast.appendChild(trP);
+
+
+          let gRow = document.createElement('div');
+    gRow.className = 'gr-row';
+    
+    let percentWin = (h.pWin / 60) * 100;
+    if (percentWin > 100) percentWin = 100;
+    
+    // ▼ 確定前（計算前）は連対・複勝を隠す処理
+    let isCalculated = (h.pRen > 0 || h.pFuku > 0);
+    let percentRen = isCalculated ? Math.min((h.pRen / 60) * 100, 100) : 0;
+    let percentFuku = isCalculated ? Math.min((h.pFuku / 60) * 100, 100) : 0;
+    let dispRen = isCalculated ? h.pRen.toFixed(1) : '-';
+    let dispFuku = isCalculated ? h.pFuku.toFixed(1) : '-';
+
+    gRow.innerHTML = `
+        <div class="gr-waku waku-${h.waku}">${h.num}</div>
+        <div class="gr-name">${h.name}</div>
+        <div class="gr-slider-wrap">
+            <button class="btn-adj" onclick="adjustGraphVal(${index}, -1)">-</button>
+            <div class="gr-bar-wrap" onclick="clickGraphBar(event, ${index})">
+                <!-- ▼ 複勝（見やすい水色に濃くしました） -->
+                <div style="position:absolute; left:0; top:0; height:100%; background:#93c5fd; width:${percentFuku}%; transition:width 0.4s ease-out;"></div>
+                <!-- ▼ 連対（鮮やかな青にしました） -->
+                <div style="position:absolute; left:0; top:0; height:100%; background:#3b82f6; width:${percentRen}%; transition:width 0.4s ease-out;"></div>
+                <!-- ▼ 勝率（引き締まる濃い紺色にしました） -->
+                <div class="gr-bar-fill" id="gfill-${index}" style="position:absolute; left:0; top:0; height:100%; background:#1d4ed8; width:${percentWin}%;"></div>
+            </div>
+            <button class="btn-adj" onclick="adjustGraphVal(${index}, 1)">+</button>
+        </div>
+        
+        <div style="width:40px; text-align:right; flex-shrink:0;">
+           <!-- 数値の色もバーの色に合わせて調整 -->
+           <div id="gval-${index}" style="font-size:12px; font-weight:bold; color:#1d4ed8;">${h.pWin.toFixed(1)}%</div>
+           <div style="font-size:9px; font-weight:bold; line-height:1.0; margin-top:1px;">
+               <span style="color:#3b82f6;">${dispRen}</span><span style="color:#64748b;">/</span><span style="color:#64748b;">${dispFuku}</span>
+           </div>
+        </div>
+        
+        <div class="gr-odds">(${isNaN(oddsVal) ? '未定' : `<span style="color:${oddsColor};">${oddsVal.toFixed(1)}倍</span>`})</div>
+    `;
+    gRows.appendChild(gRow);
+
+
+
+    let posId = h.styleVal === 1 ? 'posNige' : (h.styleVal === 2 ? 'posSenko' : (h.styleVal === 3 ? 'posSashi' : 'posOikomi'));
+    document.getElementById(posId).innerHTML += `<span class="waku waku-${h.waku}" data-id="${h.num}">${h.num}</span>`;
+  });
+
+  updateGraphTotal(totalWinP);
+}
+
+
+// ▼ 追加：グラフを直接タップした位置から勝率を計算する機能
+function clickGraphBar(e, index) {
+    let wrap = e.currentTarget;
+    let rect = wrap.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let ratio = x / rect.width;
+    if (ratio < 0) ratio = 0;
+    if (ratio > 1) ratio = 1;
+    let val = ratio * 60; // Max 60%
+    val = Math.round(val * 10) / 10; // 小数点第1位に丸める
+    updateGraphVal(index, val);
+}
+
+function updateGraphVal(index, val) {
+    horses[index].pWin = parseFloat(val);
+    document.getElementById(`gval-${index}`).textContent = horses[index].pWin.toFixed(1) + '%';
+    
+    let fill = document.getElementById(`gfill-${index}`);
+    if (fill) {
+        let percent = (val / 60) * 100;
+        if(percent > 100) percent = 100;
+        fill.style.width = percent + '%';
+    }
+    
+    let total = 0;
+    horses.forEach(h => total += h.pWin);
+    updateGraphTotal(total);
+}
+
+function updateGraphTotal(total) {
+    let tEl = document.getElementById('graph-total');
+    tEl.textContent = `合計: ${total.toFixed(1)}%`;
+    if(Math.abs(total - 100) > 0.5) {
+        tEl.classList.remove('ok'); tEl.classList.add('error');
+    } else {
+        tEl.classList.remove('error'); tEl.classList.add('ok');
+    }
+}
+
+// ▼ 追加：+/-ボタンで1%ずつグラフを動かす関数
+function adjustGraphVal(index, delta) {
+    let val = horses[index].pWin + delta;
+    if(val < 0) val = 0;
+    // 上限をなくしたい場合は下の1行を消してもOKです
+    if(val > 100) val = 100; 
+    updateGraphVal(index, val);
+}
+
+function initSortable() {
+
+    ['posNige', 'posSenko', 'posSashi', 'posOikomi'].forEach(id => {
+        new Sortable(document.getElementById(id), { group: 'shared', animation: 150 });
+    });
+}
+
+function renderDashboard() { renderTables(); }
+function updateVal(num, key, val) {
+  let h = horses.find(x => x.num === num); if(h) h[key] = val;
+  document.querySelectorAll(`.sync-${key}-${num}`).forEach(el => {
+      el.value = val;
+      if(key === 'inputMark') {
+          let wrap = el.parentElement;
+          if(val === '◎') { wrap.style.background = '#ea580c'; wrap.style.border = '1px solid transparent'; el.style.color = '#fff'; }
+          else if(val !== 'ー' && val !== '') { wrap.style.background = '#000'; wrap.style.border = '1px solid transparent'; el.style.color = '#fff'; }
+          else { wrap.style.background = '#f8fafc'; wrap.style.border = '1px dashed #cbd5e1'; el.style.color = '#64748b'; }
+      }
+  });
+}
+function setHighlight(mode) {
+  document.querySelectorAll('.hl-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelector(`.hl-btn[data-hl="${mode}"]`).classList.add('active');
+  document.body.className = document.body.className.replace(/hl-mode-\w+/g, '').trim();
+  document.body.classList.add(`hl-mode-${mode}`);
+}
+/* =========================================================
+   6. 陣営データ モーダル (あいまい検索機能付き)
+========================================================= */
+// ▼ 追加：名前の揺れ（空白、記号、文字化け、一部省略）を吸収して辞書と一致させる関数
+function findFeature(dict, name) {
+    if (!name) return null;
+    // 空白や減量記号を徹底的に排除
+    let query = name.replace(/[\s ☆★△▲◇◆]/g, '');
+    
+    // 見た目は同じでもデータが違う文字化け（康熙部首）を通常の漢字に強制変換
+    const kMap = {'⼩':'小','⼤':'大','⽥':'田','⼭':'山','⽊':'木','⽔':'水','⼟':'土','⾦':'金','⽩':'白','⿊':'黒','⾚':'赤','⻘':'青','⻑':'長','⾕':'谷','⽯':'石','⻄':'西','⾼':'高','⼾':'戸','⽒':'氏','⽴':'立','⽣':'生','⾺':'馬','⿅':'鹿'};
+    query = query.replace(/[⼩⼤⽥⼭⽊⽔⼟⾦⽩⿊⾚⻘⻑⾕⽯⻄⾼⼾⽒⽴⽣⾺⿅]/g, m => kMap[m] || m);
+
+    for (let key in dict) {
+        let dictKey = key.replace(/[\s ]/g, '');
+        // 辞書の名前と、出馬表の名前が「完全に同じ」か「どちらかに含まれていれば」ヒットとする
+        if (query === dictKey || query.includes(dictKey) || dictKey.includes(query)) {
+            return dict[key];
+        }
+    }
+    return null; // 辞書に登録がない場合
+}
+
+function showCampModal(num) {
+    let h = horses.find(x => x.num === num);
+    if(!h) return;
+
+    document.getElementById('camp-modal-title').textContent = `${h.name} の陣営データ`;
+    
+    // ▼ 修正：あいまい検索関数を使って辞書から特徴を引っ張り出す
+    let jockeyFeature = findFeature(JOCKEY_FEATURES, h.jockeyName) || "辞書に未登録です。";
+    let trainerFeature = findFeature(TRAINER_FEATURES, h.trainerName) || "辞書に未登録です。";
+    let sireFeature = findFeature(SIRE_FEATURES, h.sire) || "辞書に未登録です。";
+
+    let bodyHtml = `
+        <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:6px; padding:12px;">
+                <div style="font-size:13px; font-weight:bold; color:#1e40af; margin-bottom:4px;">🏇 騎手：${h.jockeyName}</div>
+                <div style="font-size:14px; color:#1e293b; line-height:1.5;">${jockeyFeature}</div>
+            </div>
+            <div style="background:#fce7f3; border:1px solid #fbcfe8; border-radius:6px; padding:12px;">
+                <div style="font-size:13px; font-weight:bold; color:#9d174d; margin-bottom:4px;">🏠 調教師：${h.trainerName}</div>
+                <div style="font-size:14px; color:#1e293b; line-height:1.5;">${trainerFeature}</div>
+            </div>
+            <div style="background:#fef3c7; border:1px solid #fde047; border-radius:6px; padding:12px;">
+                <div style="font-size:13px; font-weight:bold; color:#92400e; margin-bottom:4px;">💡 種牡馬：${h.sire}</div>
+                <div style="font-size:14px; color:#1e293b; line-height:1.5;">${sireFeature}</div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('camp-modal-body').innerHTML = bodyHtml;
+    document.getElementById('camp-modal').classList.add('active');
+}
+
+function closeCampModal() {
+    document.getElementById('camp-modal').classList.remove('active');
+}
+/* =========================================================
+   5. 買い目ビルダー & オッズ期待値計算 (記憶機能付き)
+========================================================= */
+function onBetTypeChange() {
+  let type = document.getElementById('bs-bet-type').value;
+  let row2 = document.getElementById('bs-row-opp2');
+  if(type === '3連複' || type === '3連単') { 
+      row2.style.display = 'flex'; 
+      document.getElementById('bs-label-opp1').textContent = '2着'; 
+  } else { 
+      row2.style.display = 'none'; 
+      document.getElementById('bs-label-opp1').textContent = '相手'; 
+  }
+  renderBuyBuilderUI();
+}
+
+function renderBuyBuilderUI() {
+  let type = document.getElementById('bs-bet-type').value;
+  
+  if (!builderState[type]) {
+      builderState[type] = { axis: [], opp1: [], opp2: [], tickets: [], oddsText: "" };
+  }
+  
+  let state = builderState[type]; 
+  
+  // ▼ 追加：切り替えた時に記憶していたテキストを復元する
+  document.getElementById('actual-odds-input').value = state.oddsText || "";
+
+  const axis = document.getElementById('bs-axis'), opp1 = document.getElementById('bs-opp1'), opp2 = document.getElementById('bs-opp2');
+  axis.innerHTML = ''; opp1.innerHTML = ''; opp2.innerHTML = '';
+  
+  [...horses].sort((a,b)=>a.num - b.num).forEach(h => {
+    let btnA = document.createElement('button'); 
+    btnA.className = 'bs-btn' + (state.axis.includes(h.num) ? ' active-axis' : ''); 
+    btnA.textContent = h.num; 
+    btnA.onclick = () => { toggleBuilder('axis', h.num); }; 
+    axis.appendChild(btnA);
+
+    let btnO1 = document.createElement('button'); 
+    btnO1.className = 'bs-btn' + (state.opp1.includes(h.num) ? ' active-opp' : ''); 
+    btnO1.textContent = h.num; 
+    btnO1.onclick = () => { toggleBuilder('opp1', h.num); }; 
+    opp1.appendChild(btnO1);
+
+    let btnO2 = document.createElement('button'); 
+    btnO2.className = 'bs-btn' + (state.opp2.includes(h.num) ? ' active-opp' : ''); 
+    btnO2.textContent = h.num; 
+    btnO2.onclick = () => { toggleBuilder('opp2', h.num); }; 
+    opp2.appendChild(btnO2);
+  });
+  
+  calcBuilder();
+}
+function toggleBuilder(pos, num) { 
+  let type = document.getElementById('bs-bet-type').value;
+  let arr = builderState[type][pos];
+  
+  if(arr.includes(num)) arr.splice(arr.indexOf(num), 1); 
+  else arr.push(num); 
+  
+  renderBuyBuilderUI(); 
+}
+
+// ▼ 追加：テキストエリアに入力された文字を裏側で保存する関数
+function saveOddsText() {
+    let type = document.getElementById('bs-bet-type').value;
+    if(builderState[type]) {
+        builderState[type].oddsText = document.getElementById('actual-odds-input').value;
+    }
+}
+
+// ▼ 修正：クリアボタンを押した時にテキストの記憶もリセットする
+function resetBuilder() { 
+  let type = document.getElementById('bs-bet-type').value;
+  builderState[type] = { axis: [], opp1: [], opp2: [], tickets: [], oddsText: "" };
+  document.getElementById('actual-odds-input').value = ""; 
+  renderBuyBuilderUI(); 
+}
+function getProbP(num) { let h = horses.find(x=>x.num===num); return h ? (h.pWin/100) : 0; }
+function harv2(pi, pj) { if (pi >= 1) pi = 0.999; return (pi * pj) / (1 - pi); }
+function harv3(pi, pj, pk) { if (pi >= 1) pi = 0.999; if (pi + pj >= 1) pj = (1 - pi) * 0.999; if (1 - pi - pj <= 0) return 0; return (pi * pj * pk) / ((1 - pi) * (1 - pi - pj)); }
+
+
+function calcBuilder() {
+    let type = document.getElementById('bs-bet-type').value;
+    let state = builderState[type];
+    let combs = [];
+    
+    if(type === '馬連' || type === 'ワイド') {
+        state.axis.forEach(a => { state.opp1.forEach(b => { if(a !== b) combs.push([a, b]); }); });
+    } else if(type === '3連複' || type === '3連単') {
+        state.axis.forEach(a => { state.opp1.forEach(b => { if(a !== b) { state.opp2.forEach(c => { if(a !== c && b !== c) combs.push([a, b, c]); }); } }); });
+    }
+    
+    let uniqueCombs = []; let seen = new Set();
+    combs.forEach(c => { 
+        let key = (type.includes('複') || type === '馬連' || type === 'ワイド') ? [...c].sort((a,b)=>a-b).join('-') : c.join('-'); 
+        if(!seen.has(key)) { seen.add(key); uniqueCombs.push({ comb: c, keyStr: key }); } 
+    });
+    
+    document.getElementById('bs-bet-count').textContent = uniqueCombs.length + "";
+
+    // 常にテキストエリアを見てオッズを自動パースする
+    let text = document.getElementById('actual-odds-input').value.trim();
+    let oddsMap = {};
+    if (text) {
+        // 全角数字を半角にし、様々なハイフンを「-」に統一
+        text = text.replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+                   .replace(/[ー－‐=＝]/g, '-');
+        let lines = text.split('\n');
+        lines.forEach(line => {
+            // JRAの「人気」列を無視して、「組番」と「オッズ」だけを正確に抜き出す
+            let match = line.match(/(\d+-\d+(?:-\d+)*)\s+([0-9.]+)/);
+            if(match) {
+                let key = match[1];
+                // ▼ 欠落していた「馬番の並び替え処理」を修復 ▼
+                if(type.includes('複') || type === '馬連' || type === 'ワイド') {
+                    key = key.split('-').map(Number).sort((a,b)=>a-b).join('-');
+                }
+                oddsMap[key] = parseFloat(match[2]);
+            }
+        });
+    }
+
+    let newTickets = [];
+    let totalProb = 0;
+    
+    uniqueCombs.forEach(ticket => {
+        let c = ticket.comb, prob = 0;
+        let a_p = getProbP(c[0]), b_p = getProbP(c[1]), c_p = c.length>2 ? getProbP(c[2]) : 0; 
+        
+        if(type === '馬連' || type === 'ワイド') { 
+            prob = harv2(a_p, b_p) + harv2(b_p, a_p); 
+        } else if(type === '3連複') { 
+            prob = harv3(a_p,b_p,c_p) + harv3(a_p,c_p,b_p) + harv3(b_p,a_p,c_p) + harv3(b_p,c_p,a_p) + harv3(c_p,a_p,b_p) + harv3(c_p,b_p,a_p); 
+        } else if(type === '3連単') { 
+            prob = harv3(a_p, b_p, c_p); 
+        }
+        
+        // 読み取ったオッズを買い目に直接反映
+        let actualOdds = oddsMap[ticket.keyStr] || null;
+        
+        totalProb += prob;
+        newTickets.push({ keyStr: ticket.keyStr, prob: prob, actualOdds: actualOdds });
+    });
+
+    state.tickets = newTickets;
+    document.getElementById('bs-summary-prob').textContent = (totalProb * 100).toFixed(1) + "%";
+    
+    calcSyntheticOdds();
+    renderTicketList();
+}
+// ▼ 新しい記憶＆計算関数
+function saveOddsAndCalc() {
+    let type = document.getElementById('bs-bet-type').value;
+    let text = document.getElementById('actual-odds-input').value;
+    
+    if (!builderState[type]) {
+        builderState[type] = { axis: [], opp1: [], opp2: [], tickets: [], oddsText: "" };
+    }
+    
+    builderState[type].oddsText = text; // 裏側にテキストを記憶
+    calcBuilder(); // 即座にオッズを反映させる
+    
+    alert(`【${type}】のオッズを記憶＆計算しました！\n馬番を追加・変更しても自動でオッズが反映されます。`);
+}
+function calcSyntheticOdds() {
+    let type = document.getElementById('bs-bet-type').value;
+    let state = builderState[type];
+    let sumInv = 0;
+    let hasOdds = false;
+    
+    state.tickets.forEach(t => {
+        if(t.actualOdds && t.actualOdds > 0) {
+            sumInv += (1 / t.actualOdds);
+            hasOdds = true;
+        }
+    });
+    
+    let synOdds = (hasOdds && sumInv > 0) ? (1 / sumInv) : 0;
+    document.getElementById('bs-summary-odds').textContent = synOdds > 0 ? synOdds.toFixed(1) + " 倍" : "---";
+}
+
+function renderTicketList() {
+    let type = document.getElementById('bs-bet-type').value;
+    let state = builderState[type];
+    let listEl = document.getElementById('ticket-list');
+    listEl.innerHTML = '';
+    
+    state.tickets.forEach(t => {
+        let ev = t.actualOdds ? (t.prob * t.actualOdds).toFixed(2) : '---';
+        let evClass = (t.actualOdds && (t.prob * t.actualOdds) >= 1.0) ? 'ev-high' : '';
+        
+        let html = `
+            <div class="ticket-row">
+                <div class="ticket-comb">${t.keyStr}</div>
+                <div class="ticket-prob">${(t.prob * 100).toFixed(1)}%</div>
+                <div class="ticket-odds">${t.actualOdds ? t.actualOdds.toFixed(1) + '倍' : '- 倍'}</div>
+                <div class="ticket-ev ${evClass}">EV: ${ev}</div>
+            </div>
+        `;
+        listEl.innerHTML += html;
+    });
+}
+
+/* =========================================================
+   7. データ保存・ダウンロード機能
+========================================================= */
+function exportHtml() {
+  const stateData = {
+      horses: horses,
+      builderState: builderState,
+      raceInfo: raceInfo,
+      memo: document.getElementById('race-memo').value, // AI見解やメモを記憶
+      actualOddsText: document.getElementById('actual-odds-input').value, // 貼り付けたオッズテキストを記憶
+      currentBetType: document.getElementById('bs-bet-type').value // 現在選択している券種(馬連・3連複など)を記憶
+  };
+
+  let stateNode = document.getElementById('saved-state');
+  if(!stateNode) {
+      stateNode = document.createElement('script');
+      stateNode.id = 'saved-state';
+      stateNode.type = 'application/json';
+      document.body.appendChild(stateNode);
+  }
+  stateNode.textContent = encodeURIComponent(JSON.stringify(stateData));
+
+  const htmlContent = document.documentElement.outerHTML;
+  const blob = new Blob(['<!DOCTYPE html>\n' + htmlContent], {type: 'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  
+  const fileName = raceInfo.basho ? `${raceInfo.basho}${raceInfo.num}_予測データ.html` : 'today_horses.html';
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  alert("オッズや買い目を含めた現在の状態をダウンロードしました！\nこのHTMLファイルを仲間に送れば、まったく同じ画面を共有できます。");
+}
+/* =========================================================
+   ブラウザ保存（LocalStorage）機能
+========================================================= */
+// 1. レースをブラウザに保存する
+function saveRaceToLocal() {
+    if (!raceInfo.basho || !raceInfo.num) {
+        alert("レース情報がありません。");
+        return;
+    }
+    const raceKey = raceInfo.basho + raceInfo.num; // 例: "阪神11R"
+    const stateData = {
+        horses: horses,
+        builderState: builderState,
+        raceInfo: raceInfo,
+  memo: document.getElementById('race-memo').value, // ←これを追加
+        savedAt: new Date().toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    };
+    
+    let savedRaces = JSON.parse(localStorage.getItem('jra_saved_races') || '{}');
+    savedRaces[raceKey] = stateData;
+    localStorage.setItem('jra_saved_races', JSON.stringify(savedRaces));
+    
+    alert(`【${raceKey}】の予想データを保存しました！\n「リセット / 戻る」ボタンを押すと、初期画面のリストからいつでも呼び出せます。`);
+}
+
+// 2. 初期画面に保存済みレースのボタンを表示する
+function renderSavedRaces() {
+    let savedRaces = JSON.parse(localStorage.getItem('jra_saved_races') || '{}');
+    let listEl = document.getElementById('saved-races-list');
+    let areaEl = document.getElementById('saved-races-area');
+    
+    listEl.innerHTML = '';
+    let keys = Object.keys(savedRaces);
+    
+    if (keys.length > 0) {
+        areaEl.style.display = 'block';
+        keys.forEach(key => {
+            let btn = document.createElement('button');
+            btn.style = "background: #f1f5f9; border: 2px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; color: #1e293b; font-size: 13px; transition: 0.2s;";
+            btn.onmouseover = () => btn.style.background = '#e2e8f0';
+            btn.onmouseout = () => btn.style.background = '#f1f5f9';
+            btn.innerHTML = `🏇 ${key}<br><span style="font-size:10px; color:#64748b;">${savedRaces[key].savedAt} 保存</span>`;
+            btn.onclick = () => loadRaceFromLocal(key);
+            listEl.appendChild(btn);
+        });
+    } else {
+        areaEl.style.display = 'none';
+    }
+}
+
+// 3. 保存されたレースを復元する
+function loadRaceFromLocal(key) {
+    let savedRaces = JSON.parse(localStorage.getItem('jra_saved_races') || '{}');
+    let parsed = savedRaces[key];
+    if (!parsed) return;
+    
+    horses = parsed.horses;
+    builderState = parsed.builderState || { "馬連": { axis: [], opp1: [], opp2: [], tickets: [] }, "ワイド": { axis: [], opp1: [], opp2: [], tickets: [] }, "3連複": { axis: [], opp1: [], opp2: [], tickets: [] }, "3連単": { axis: [], opp1: [], opp2: [], tickets: [] } };
+    raceInfo = parsed.raceInfo;
+ // ▼ 追加：メモ欄の復元
+    if (parsed.memo !== undefined) {
+        document.getElementById('race-memo').value = parsed.memo;
+    }
+    
+    // 画面切り替え処理
+    document.getElementById('screen-init').classList.remove('active');
+    document.getElementById('screen-main').classList.add('active');
+    
+    document.getElementById('rt-basyo').textContent = raceInfo.basho + raceInfo.num;
+      // ▼ 「〇〇R」の直前で改行を入れる処理 ▼
+  let formattedTitle = raceInfo.title.replace(/(\d+R)/, '<br>$1');
+  document.getElementById('rt-name').innerHTML = formattedTitle;
+
+    document.getElementById('rt-course').textContent = raceInfo.track + raceInfo.dist + "m";
+    document.getElementById('race-title-display').style.display = 'flex'; 
+    document.getElementById('btn-back').style.display = 'block';
+    
+    let courseKey = `${raceInfo.basho}_${raceInfo.track}_${raceInfo.dist}m`;
+    let courseKeyOut = `${raceInfo.basho}_${raceInfo.track}_${raceInfo.dist}m_外`; 
+    let featureText = COURSE_FEATURES[courseKeyOut] || COURSE_FEATURES[courseKey] || "データがありません。";
+    document.getElementById('cf-text').textContent = featureText;
+    document.getElementById('course-feature').style.display = 'block';
+
+    calcHarvilleInternal();
+    renderDashboard();
+    renderBuyBuilderUI();
+    initSortable();
+}
+
+// 4. 保存データを全て消す
+function clearSavedRaces() {
+    if (confirm("保存したレースデータを全て消去しますか？")) {
+        localStorage.removeItem('jra_saved_races');
+        renderSavedRaces();
+    }
+}
+/* =========================================================
+   追加：グラフを初期状態（オッズ基準・連複は非表示）に戻す
+========================================================= */
+function resetGraphToOdds() {
+    horses.forEach(h => {
+        let val = 80 / h.odds;
+        h.pWin = isNaN(val) ? 0 : val; // 勝率はオッズ基準に戻す
+        h.pRen = 0;  // 連対率を非表示に
+        h.pFuku = 0; // 複勝率を非表示に
+    });
+    renderTables();
+    calcBuilder(); // 買い目の計算も初期化
+}
+/* =========================================================
+   追加：オッズのテキストを明示的に記憶するボタンの処理
+========================================================= */
+/* =========================================================
+   追加：買い目リストをクリップボードにコピーする機能
+========================================================= */
+function copyTickets() {
+    let type = document.getElementById('bs-bet-type').value;
+    let state = builderState[type];
+    
+    if (!state || state.tickets.length === 0) {
+        alert("コピーする買い目がありません。");
+        return;
+    }
+    
+    let text = `【${type}】\n`;
+    state.tickets.forEach(t => {
+        let oddsStr = t.actualOdds ? `(${t.actualOdds.toFixed(1)}倍)` : "";
+        text += `${t.keyStr} ${oddsStr}\n`;
+    });
+    
+    navigator.clipboard.writeText(text).then(() => {
+        alert("買い目リストをコピーしました！\nLINEやメモ帳などに貼り付けて保存してください。");
+    }).catch(err => {
+        alert("コピーに失敗しました。お使いのブラウザが対応していない可能性があります。");
+    });
+}
+window.addEventListener('DOMContentLoaded', () => {
+  renderSavedRaces();
+  
+  const savedState = document.getElementById('saved-state');
+  if(savedState && savedState.textContent.trim()) {
+      try {
+          const parsed = JSON.parse(decodeURIComponent(savedState.textContent.trim()));
+          if(parsed.horses) horses = parsed.horses;
+          if(parsed.builderState) builderState = parsed.builderState;
+          if(parsed.raceInfo) raceInfo = parsed.raceInfo;
+          
+          // ▼ 追加：メモ・オッズテキスト・券種の復元 ▼
+          if(parsed.memo !== undefined) {
+              document.getElementById('race-memo').value = parsed.memo;
+          }
+          if(parsed.actualOddsText !== undefined) {
+              document.getElementById('actual-odds-input').value = parsed.actualOddsText;
+          }
+          if(parsed.currentBetType !== undefined) {
+              document.getElementById('bs-bet-type').value = parsed.currentBetType;
+              onBetTypeChange(); // 3連複などの表示枠に切り替え
+          }
+          
+          document.getElementById('screen-init').classList.remove('active');
+          document.getElementById('screen-main').classList.add('active');
+          
+          document.getElementById('rt-basyo').textContent = raceInfo.basho + raceInfo.num;
+          document.getElementById('rt-name').textContent = raceInfo.title;
+          document.getElementById('rt-course').textContent = raceInfo.track + raceInfo.dist + "m";
+          document.getElementById('race-title-display').style.display = 'flex'; 
+          
+          let courseKey = `${raceInfo.basho}_${raceInfo.track}_${raceInfo.dist}m`;
+          let courseKeyOut = `${raceInfo.basho}_${raceInfo.track}_${raceInfo.dist}m_外`; 
+          let featureText = COURSE_FEATURES[courseKeyOut] || COURSE_FEATURES[courseKey] || "データがありません。";
+          document.getElementById('cf-text').textContent = featureText;
+          document.getElementById('course-feature').style.display = 'block';
+
+                  renderDashboard();
+          renderBuyBuilderUI();
+          initSortable();
+      } catch(e) {
+          console.error("保存データの復元に失敗しました", e);
+      }
+  }
+});
+
+/* =========================================================
+   iPhone専用 新解析エンジン (V7) - レース名取得を完全強化
+========================================================= */
+function parseTextIphoneV2() {
+    try {
+        let rawText = document.getElementById('jra-input-iphone').value.trim();
+        if (!rawText) { alert("テキストが入力されていません。"); return; }
+
+        rawText = rawText.replace(/[０-９ａ-ｚＡ-Ｚ]/g, function(s) {
+            return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+        }).replace(/[（]/g, '(').replace(/[）]/g, ')')
+          .replace(/⽗/g, '父').replace(/⺟/g, '母')
+          .replace(/⼈/g, '人').replace(/⼩/g, '小').replace(/⼤/g, '大')
+          .replace(/⽥/g, '田').replace(/⼭/g, '山').replace(/⽊/g, '木')
+          .replace(/⽔/g, '水').replace(/⼟/g, '土').replace(/⾦/g, '金')
+          .replace(/⽩/g, '白').replace(/⿊/g, '黒').replace(/⾚/g, '赤')
+          .replace(/⻘/g, '青').replace(/⻑/g, '長').replace(/⾕/g, '谷')
+          .replace(/⽯/g, '石').replace(/⻄/g, '西').replace(/⾼/g, '高');
+
+        horses = []; 
+        sameRaceKeysMap = {};
+        let lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== "");
+
+        raceInfo = { basho: "不明", num: "11R", title: "レース名不明", track: "芝", dist: "1600" };
+
+        for(let i = 0; i < Math.min(30, lines.length); i++) {
+            let l = lines[i];
+            let bashoNumMatch = l.match(/(札幌|函館|福島|新潟|中山|東京|中京|京都|阪神|小倉)[\s　]*(\d{1,2})R/);
+            if (bashoNumMatch && raceInfo.basho === "不明") {
+                raceInfo.basho = bashoNumMatch[1];
+                raceInfo.num = bashoNumMatch[2] + "R";
+            }
+            
+            // レース名の取得パターン1 (〇回〇山〇日)
+            let tMatch = l.match(/\d+回[^\d]+\d+日\d+R[\s　]+(?:第\d+回)?[\s　]*(.+)/);
+            if (tMatch) raceInfo.title = tMatch[1].trim();
+            
+            // レース名の取得パターン2 (キーワード強制抽出) ★これを復活・強化しました！
+            let titleMatch = l.match(/([^\s　]+(?:特別|賞|杯|ステークス|カップ|S|C|記念|ハンデ|ハンデキャップ|オープン|G[123]|Jpn[123]|クラス|新馬|未勝利))/);
+            if (titleMatch && !l.includes("コース") && !l.includes("本賞金") && raceInfo.title === "レース名不明") {
+                raceInfo.title = titleMatch[1].replace(/第\d+回/, '').trim();
+            }
+            
+            let dMatch = l.match(/コース[\s　]*(\d+)m[\s　]*(芝|ダート|ダ|障)/);
+            if(dMatch) { 
+                raceInfo.dist = dMatch[1];
+                raceInfo.track = (dMatch[2].includes("ダ") || dMatch[2].includes("ダート")) ? "ダート" : "芝"; 
+            }
+        }
+        
+        if (raceInfo.track === 'ダート') document.documentElement.style.setProperty('--table-header', '#78350f'); 
+        else document.documentElement.style.setProperty('--table-header', '#166534');
+
+        document.getElementById('rt-basyo').textContent = raceInfo.basho + raceInfo.num;
+        document.getElementById('rt-name').textContent = raceInfo.title;
+        
+        try {
+            let stTime = getStandardTime(raceInfo.basho, raceInfo.track, raceInfo.dist, raceInfo.title);
+            if (stTime && stTime !== '-') {
+                document.getElementById('rt-course').innerHTML = `${raceInfo.track}${raceInfo.dist}m <span style="color:#fde047; margin-left:8px; font-size:11px;">(基準: ${stTime})</span>`;
+            } else {
+                document.getElementById('rt-course').textContent = raceInfo.track + raceInfo.dist + "m";
+            }
+        } catch(e) { document.getElementById('rt-course').textContent = raceInfo.track + raceInfo.dist + "m"; }
+        
+        document.getElementById('race-title-display').style.display = 'flex'; 
+        document.getElementById('btn-back').style.display = 'block';
+
+        let horseBlocks = [];
+        let currentBlock = [];
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            let isHorseStart = false;
+            let horseLineMatch = line.match(/^(.+?)[\s　]+(\d{1,3}\.\d|---)(?:[\s　]*\(\d+番.*?\))?$/);
+            
+            if (horseLineMatch) {
+                let potentialName = horseLineMatch[1];
+                if (!potentialName.includes("3F") && !potentialName.includes("万円") && !potentialName.match(/\d:\d{2}/) && !potentialName.includes("kg")) {
+                    isHorseStart = true;
+                }
+            }
+            
+            if (isHorseStart) {
+                let preLines = [];
+                while (currentBlock.length > 0) {
+                    let lastL = currentBlock[currentBlock.length - 1];
+                    if (lastL.match(/^([1-9]|1[0-8])$/) || lastL.match(/^([1-8])[\s　]+([1-9]|1[0-8])$/)) {
+                        preLines.unshift(currentBlock.pop());
+                    } else { break; }
+                }
+                if (currentBlock.length > 0) horseBlocks.push(currentBlock);
+                currentBlock = [...preLines, line];
+            } else {
+                currentBlock.push(line);
+            }
+        }
+        if (currentBlock.length > 0) horseBlocks.push(currentBlock);
+
+        horseBlocks = horseBlocks.filter(block => block.some(l => l.match(/^(.+?)[\s　]+(\d{1,3}\.\d|---)/) && !l.includes("万円") && !l.includes("3F")));
+
+        horseBlocks.forEach((block, blockIndex) => {
+            let nameLine = block.find(l => l.match(/^(.+?)[\s　]+(\d{1,3}\.\d|---)/) && !l.includes("万円") && !l.includes("3F"));
+            if (!nameLine) return;
+            
+            let nameMatch = nameLine.match(/^(.+?)[\s　]+(\d{1,3}\.\d|---)/);
+            let rawName = nameMatch[1];
+            let name = rawName.replace(/^\d+[\s　]+/, '').trim(); 
+            let odds = nameMatch[2] === '---' ? 999.9 : parseFloat(nameMatch[2]);
+            let waku = null, num = null, sire = "不明", jockeyName = "不明", trainerName = "不明";
+            
+            let inlineNumMatch = rawName.match(/^(\d+)[\s　]+/);
+            if (inlineNumMatch) num = parseInt(inlineNumMatch[1], 10);
+
+            let dates = [], places = [], titles = [], ranks = [], times = [], timeSecs = [], passOrders = [], agaris = [], agariSecs = [], margins = [], winners = [];
+
+            let sireIdx = block.findIndex(l => l.startsWith('父'));
+            if (sireIdx !== -1 && sireIdx + 1 < block.length) {
+                let jName = block[sireIdx + 1].trim();
+                if (!jName.match(/\d/)) jockeyName = jName.replace(/^[☆★△▲◇◆]/, '');
+            }
+
+            for (let i = 0; i < block.length; i++) {
+                let l = block[i];
+                let numMatch = l.match(/^([1-8])[\s　]+([1-9]|1[0-8])$/);
+                if(numMatch && waku === null && num === null) { waku = parseInt(numMatch[1], 10); num = parseInt(numMatch[2], 10); continue; }
+                let wakuOnlyMatch = l.match(/^([1-8])$/);
+                if (wakuOnlyMatch && waku === null) { waku = parseInt(wakuOnlyMatch[1], 10); continue; }
+                let numOnlyMatch = l.match(/^([1-9]|1[0-8])$/);
+                if (numOnlyMatch && waku !== null && num === null) { num = parseInt(numOnlyMatch[1], 10); continue; }
+
+                if (l.includes('（栗東）') || l.includes('（美浦）')) {
+                    let nameArr = l.replace(/[（\(][栗美]東[）\)]/g, '').trim().split(/[\s　]+/);
+                    trainerName = nameArr.length >= 2 ? nameArr[nameArr.length-2] + nameArr[nameArr.length-1] : nameArr[0]; continue;
+                }
+                if (l.match(/^父/)) { sire = l.replace(/^父[\s　]*/, '').replace(/[（\(].*$/, '').replace(/母.*$/, '').trim(); continue; }
+                
+                let dMatch = l.match(/^(\d{4}\.\d{2}\.\d{2})/);
+                if(dMatch) { dates.push(dMatch[1].substring(2)); continue; }
+                let pMatch = l.match(/^(札幌|函館|福島|新潟|中山|東京|中京|京都|阪神|小倉)[\s　]+(.+)/);
+                if(pMatch) { places.push(pMatch[1]); titles.push(pMatch[2].trim().split(/[\s　]+/)[0]); continue; }
+                let rkMatch = l.match(/^(\d+)着/);
+                if(rkMatch) { ranks.push(rkMatch[1]); continue; }
+                let tmMatch = l.match(/(\d{1,2}:\d{2}\.\d)[\s　]+(.*?)[\s　]*3F[\s　]*(\d{2}\.\d)/);
+                if(tmMatch) {
+                    times.push(tmMatch[1]); timeSecs.push(parseInt(tmMatch[1].split(':')[0]) * 60 + parseFloat(tmMatch[1].split(':')[1]));
+                    passOrders.push(tmMatch[2].trim() || "-"); agaris.push(tmMatch[3]); agariSecs.push(parseFloat(tmMatch[3])); continue;
+                }
+                
+                let mMatch = l.match(/^([^\s　0-9]+(?:[A-Za-z0-9]*)?)[\s　]*\((-?\d+\.\d+)\)/);
+                if (mMatch && !l.includes('kg')) { winners.push(mMatch[1].trim()); margins.push(mMatch[2]); continue; }
+            }
+
+            if (num === null) num = blockIndex + 1;
+            if (waku === null) waku = Math.ceil(num / 2) > 8 ? 8 : Math.ceil(num / 2);
+
+            let races = [];
+            let avgPosSum = 0; let avgPosCount = 0;
+            let raceCount = Math.min(dates.length, 4);
+            
+            for (let r = 0; r < raceCount; r++) {
+                let rank = ranks[r] || "-", rDate = dates[r] || "-", rPlace = places[r] || "-", title = titles[r] || "-";
+                let passOrder = passOrders[r] || "-", time = times[r] || "-", timeSec = timeSecs[r] || 999.9, agari = agaris[r] || "-", agariSec = agariSecs[r] || 99.9;
+                let margin = margins[r] || "-", winner = winners[r] || "-";
+                if (passOrder !== "-") {
+                    let positions = passOrder.split('-').map(Number);
+                    let validPositions = positions.filter(p => !isNaN(p));
+                    if (validPositions.length > 0) {
+                        avgPosSum += validPositions.reduce((a, b) => a + b, 0) / validPositions.length; 
+                        avgPosCount++;
+                    }
+                }
+                races.push({ rank, margin, winner, rDate, rPlace, title, passOrder, time, timeSec, agari, agariSec, raceKey: `${rDate}_${rPlace}_${title}` });
+            }
+
+            let style = "差", styleVal = 3, avgPosDisp = "-";
+            if(avgPosCount > 0) {
+                let avg = avgPosSum / avgPosCount; avgPosDisp = avg.toFixed(1);
+                if(avg <= 3.0) { style = "逃"; styleVal = 1; } else if(avg <= 6.5) { style = "先"; styleVal = 2; } else if(avg <= 10.5) { style = "差"; styleVal = 3; } else { style = "追"; styleVal = 4; }
+            }
+
+            horses.push({ num, waku, name, odds, sire, jockeyName, trainerName, races, inputMark: 'ー', style, styleVal, avgPosDisp, pWin: 0, pRen: 0, pFuku: 0, campData: null });
+        });
+
+        if (horses.length === 0) { alert("馬のデータを抽出できませんでした。"); return; }
+
+        horses.forEach(h => {
+            let val = 80 / h.odds;
+            h.pWin = isNaN(val) ? 0 : val;
+        });
+
+        calcBestTimes();
+        renderDashboard();
+        renderBuyBuilderUI();
+        initSortable();
+        try { generateRaceCommentary(); } catch(e) {}
+        
+        document.getElementById('screen-init').classList.remove('active');
+        document.getElementById('screen-main').classList.add('active');
+
+    } catch (err) {
+        alert("エラーが発生しました:\n" + err.message);
+    }
+}
+
+
+
+
+</script>
+</body>
+</html>
